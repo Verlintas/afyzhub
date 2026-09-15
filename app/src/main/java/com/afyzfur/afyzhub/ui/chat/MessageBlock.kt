@@ -243,17 +243,6 @@ private fun MessageBody(
         }
     }
 
-    // 只在用户侧显示。助手侧的进度已由输入栏的阶段文字承担，
-    // 且流式回复本身在逐字呈现，气泡下再挂一行"发送中"是重复信息
-    if (message.isSending && message.isFromUser) {
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "发送中",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 
 /**
  * 头像。
