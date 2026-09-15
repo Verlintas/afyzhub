@@ -456,6 +456,7 @@ class ChatRepositoryImpl(
     )
 
     private companion object {
+        private const val BATCH_UPDATE_WINDOW_MS = 50L
         /** 抽屉摘要行的字符上限，足够填满一行且留有余量 */
         const val SUMMARY_MAX_LENGTH = 60
     }
