@@ -410,19 +410,6 @@ private fun ChatContent(
                                 onLongPress = { onLongPress(message) }
                             )
                         }
-                        // 流式回复已在正文内逐字呈现，无需额外的等待指示
-                        val streaming = messages.lastOrNull()
-                            ?.let { !it.isFromUser && it.isSending } == true
-                        if (isLoading && !streaming) {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                }
-                            }
-                        }
                     }
                 }
 
