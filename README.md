@@ -1,132 +1,76 @@
-# AfyzHub
-
 <div align="center">
 
-**一个简洁的 Android AI 聊天客户端**
+# AfyzHub
+
+**把聊天界面还给内容本身。**
+
+一个 Android AI 聊天客户端，Kotlin + Jetpack Compose 构建。
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://www.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.20-purple.svg)](https://kotlinlang.org)
+[![Release](https://img.shields.io/badge/version-v0.3.5--dev-orange.svg)](https://github.com/afyzfur/afyzhub/releases)
 
-[下载 APK](https://github.com/afyzfur/afyzhub/releases)
+[下载 APK](https://github.com/afyzfur/afyzhub/releases) · [更新日志](CHANGELOG.md)
 
 </div>
 
 ---
 
-## 📖 项目简介
+## 为什么是 AfyzHub
 
-AfyzHub 是一个开源的 Android AI 聊天应用，采用 Kotlin + Jetpack Compose 构建，遵循 Material Design 3 设计规范。
+多数 AI 客户端把功能做成了面板堆砌。AfyzHub 的思路相反：界面为聊天内容服务，每一处设计都可以回答"为什么要出现在这里"——
 
-支持 OpenAI、Anthropic Claude 与 Google Gemini 三家服务，各自的密钥与配置独立保存，可随时切换。
+- 发送状态只在输入栏出现一行字，气泡下不再挂"发送中"
+- 思考过程折叠在正文旁，不与回答混排
+- 流式回复逐字呈现，进度由内容本身说明
 
-**当前状态**：v0.2.6-dev 开发预览版
+## 功能
 
----
+### 对话
 
-## ✨ 功能特性
+流式输出逐字呈现（SSE，可关闭），任何阶段可暂停且保留已生成内容。支持 Markdown 渲染、思考过程展示、失败重试、编辑重发、消息回滚（内容自动放回输入栏）、删除撤回。消息元信息（模型、token 用量、耗时）可分项开关。
 
-### 已实现
+### 模型与配置
 
-- ✅ 简洁的聊天界面
-- ✅ 多 AI 提供商：OpenAI、Anthropic Claude、Google Gemini
-- ✅ 各提供商的密钥、模型与地址独立保存，切换互不影响
-- ✅ 模型列表从服务端动态获取并本地缓存，也可手动输入模型名
-- ✅ 对话历史保存
-- ✅ 多轮对话上下文
-- ✅ 流式响应（SSE，可在设置中关闭）
-- ✅ Markdown 渲染（代码块、列表、标题、链接等）
-- ✅ 自定义 API 地址，支持中转服务
-- ✅ 发送失败重试
-- ✅ 设置自动保存
-- ✅ 会话抽屉，按时间分组并显示末条消息摘要
-- ✅ 消息元信息：时间戳、模型名、token 用量、生成速度、响应耗时（可分项开关）
-- ✅ 请求日志，可查看接口请求与响应以排查失败原因（密钥已脱敏）
-- ✅ 深色模式与动态取色开关
-- ✅ 首屏提示词可自定义
-- ✅ 六套预设配色，另支持 Material You 动态取色
-- ✅ 消息气泡样式、头像与聊天背景可自定义
+OpenAI、Anthropic Claude、Google Gemini 三家，各家密钥与地址独立。支持任意多组配置同存——不同额度、不同中转、测试与生产互不覆盖。模型列表从服务端拉取并缓存，可筛选只显示常用的；输入栏左下角点一下即弹出半屏选择器，选模型的同时切好配置组。Claude 与 Gemini 的思考程度（token 预算）也已接入，输入栏按钮对三家同样有效。
 
-### 开发中
+### 会话管理
 
-- 🚧 对话搜索与导出
-- 🚧 系统提示词设置
-- 🚧 消息编辑与重新生成
+抽屉式会话列表，按时间分组、显示末条摘要，支持置顶、星标、自定义分组。可按标题、总结、简介、分组搜索，多个关键词空格分隔。
 
----
+### 外观
 
-## 🚀 快速开始
+六套预设配色（石墨为默认，品牌橙只留在图标上）加 Material You 动态取色。深色模式、消息气泡样式、双侧头像、聊天背景均可自定义；背景支持遮罩与模糊叠加、四边裁剪，设置页预览与聊天页所见一致。输入栏透视分两档，增强档连文字一起半透，能看见压在下面的消息。
 
-### 下载安装
+### 联网与日志
 
-前往 [Releases](https://github.com/afyzfur/afyzhub/releases) 页面下载已签名的 APK，直接安装即可。
+Gemini 原生联网搜索，设置页一键开关。请求日志记录提供商、模型与实际主机名（密钥脱敏），成功的请求也保留，可按时间、模型、提供商、只看失败叠加筛选。
 
-### 使用要求
+### 隐私
 
-- Android 8.0 (API 26) 或更高版本
-- 至少一家服务的 API Key（OpenAI、Claude 或 Gemini）
+API Key 仅存储在本机，不经过任何第三方服务。
 
-### 配置步骤
+## 快速开始
 
-1. 安装并打开应用
-2. 进入设置页面
-3. 选择服务提供商
-4. 填入对应的 API Key
-5. 点击「获取模型列表」，从结果中选择模型；也可直接输入模型名
-6. 返回聊天页面开始对话
+1. 从 [Releases](https://github.com/afyzfur/afyzhub/releases) 下载 APK 安装（Android 8.0+）
+2. 设置 → API 配置，新建一组配置
+3. 填入任一服务的 Key（自定义地址支持中转）
+4. 拉取模型列表并选择，返回聊天
 
-设置会自动保存，无需手动确认。API Key 仅存储在本机。
+无需注册，无需服务器。
 
----
+## 技术栈
 
-## 🛠 技术栈
+| 层 | 选择 |
+|---|---|
+| UI | Jetpack Compose, Material 3 |
+| 架构 | MVVM, Koin |
+| 网络 | OkHttp（含 SSE 流式） |
+| 存储 | Room, DataStore |
+| 序列化 | Kotlin Serialization |
 
-- **Kotlin** 2.0.20
-- **Jetpack Compose** - 声明式 UI 框架
-- **Koin** - 依赖注入
-- **OkHttp** - 网络请求与 SSE 流式读取
-- **Kotlin Serialization** - JSON 序列化
-- **Room** - 本地数据库
-- **DataStore** - 配置存储
-
----
-
-## 🗺 开发计划
-
-### 阶段一：MVP
-
-- [x] 基础聊天功能
-- [x] OpenAI API 集成
-- [x] 对话历史保存
-- [x] 流式响应
-- [x] Markdown 渲染
-
-### 阶段二：功能扩展
-
-- [x] 多 AI 提供商（Claude、Gemini）
-- [ ] 对话管理（分组、搜索、导出）
-- [ ] 系统提示词设置
-- [ ] 图片上传
-- [ ] 语音输入
-
-### 阶段三：高级特性
-
-- [ ] 插件系统
-- [ ] 本地模型支持
-- [ ] 跨平台（KMP）
-
----
-
-## 🔨 本地开发
-
-### 环境要求
-
-- JDK 17+
-- Android Studio Ladybug (2024.2.1)+
-- Android SDK 35
-- Gradle 8.9
-
-### 构建步骤
+## 本地构建
 
 ```bash
 git clone https://github.com/afyzfur/afyzhub.git
@@ -134,25 +78,20 @@ cd afyzhub
 ./gradlew assembleDebug
 ```
 
-APK 位于 `app/build/outputs/apk/` 目录。
+需要 JDK 17+、Android SDK 35。产物在 `app/build/outputs/apk/`。
+
+## 版本说明
+
+1.0.0 之前均为开发版（`-dev` 后缀，语义化版本），以预发行版形式发布。完整更新记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 协议与贡献
+
+[Apache License 2.0](LICENSE)。欢迎 Issue 与 Pull Request。
 
 ---
 
-## 📝 更新日志
+<div align="center">
 
-1.0.0 正式版之前的所有版本均为开发版，带 `-dev` 后缀并以预发行版形式发布。
+**AfyzHub** · 界面为内容服务
 
-各版本的具体更新内容见 [CHANGELOG.md](CHANGELOG.md)，也可在对应的
-[Release 详情页](https://github.com/afyzfur/afyzhub/releases)直接查看。
-
----
-
-## 📄 开源协议
-
-本项目采用 [Apache License 2.0](LICENSE) 协议开源。
-
----
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
+</div>
