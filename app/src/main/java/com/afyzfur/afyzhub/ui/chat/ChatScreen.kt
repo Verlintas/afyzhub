@@ -513,6 +513,7 @@ private fun ChatContent(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/* v0.3.5-dev: 输入栏模型选择由全屏页改为底部半屏选择器 */
 private fun ModelPickerSheet(
     viewModel: ApiProfilesViewModel,
     onDismiss: () -> Unit
