@@ -8,8 +8,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import com.afyzfur.afyzhub.ui.components.ModelIcon
+import com.afyzfur.afyzhub.ui.settings.ApiProfilesViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -50,6 +58,7 @@ fun ChatScreen(
     onNavigateToProvider: () -> Unit,
     /** 打开纯模型切换页 */
     onNavigateToModelPicker: () -> Unit,
+    apiProfilesViewModel: ApiProfilesViewModel = koinViewModel(),
     hostViewModel: ChatHostViewModel = koinViewModel(),
     viewModel: ChatViewModel = koinViewModel()
 ) {
@@ -80,6 +89,9 @@ fun ChatScreen(
 
     /** 思考程度选择表的开关 */
     var showEffortSheet by remember { mutableStateOf(false) }
+
+    /** 模型选择半屏选择器开关 */
+    var showModelPicker by remember { mutableStateOf(false) }
 
     val undoable by viewModel.undoable.collectAsState()
 
@@ -189,7 +201,7 @@ fun ChatScreen(
                 }
             },
             onStop = { viewModel.stopGenerating() },
-            onPickModel = onNavigateToModelPicker,
+            onPickModel = { showModelPicker = true },
             undoable = undoable,
             onUndoRemoval = { viewModel.undoRemoval() },
             onDismissUndo = { viewModel.dismissUndo() },
@@ -248,6 +260,13 @@ fun ChatScreen(
             current = settings.thinkingEffort,
             onSelect = hostViewModel::setThinkingEffort,
             onDismiss = { showEffortSheet = false }
+        )
+    }
+
+    if (showModelPicker) {
+        ModelPickerSheet(
+            viewModel = apiProfilesViewModel,
+            onDismiss = { showModelPicker = false }
         )
     }
 }
@@ -492,4 +511,78 @@ private fun ChatContent(
  * 0.82 留出约五分之一：足够看清背后是聊天页、也够点，同时抽屉本身
  * 仍有足够宽度容纳会话标题不至于频繁折行。
  */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelPickerSheet(
+    viewModel: ApiProfilesViewModel,
+    onDismiss: () -> Unit
+) {
+    val store by viewModel.store.collectAsState()
+    val activeId = store.active?.id
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Text(
+            text = "选择模型",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp)
+        ) {
+            store.profiles.forEach { profile ->
+                if (profile.effectiveSelectedModels.isNotEmpty()) {
+                    item(key = "header-${profile.id}") {
+                        Text(
+                            text = profile.displayName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                        )
+                    }
+                    items(
+                        items = profile.effectiveSelectedModels,
+                        key = { "${profile.id}-$it" }
+                    ) { model ->
+                        val isSelected = profile.id == activeId && model == profile.effectiveModel
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(AppShapeTokens.SettingsGroup)
+                                .clickable {
+                                    viewModel.selectModelAndProfile(profile.id, model, onDismiss)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                        ) {
+                            ModelIcon(modelName = model, size = 24.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = model,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "当前使用",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                    item(key = "gap-${profile.id}") { Spacer(Modifier.height(8.dp)) }
+                }
+            }
+        }
+    }
+}
+
 private const val DRAWER_WIDTH_FRACTION = 0.82f
