@@ -15,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import com.afyzfur.afyzhub.ui.components.ModelIcon
@@ -107,11 +109,59 @@ fun ChatScreen(
         }
     }
 
+    /**
+     * 滚动跟随策略。
+     *
+     * 旧实现每次内容变化都无条件 animateScrollToItem 到底部：AI 思考与
+     * 流式输出时用户想往上翻看历史消息，会被不断拽回底部，等于没法读。
+     *
+     * 现在只有"仍然贴着底部"时才跟随。用户上滑离开底部即停止，滚回
+     * 底部附近自动恢复。判断用的是 canScrollForward——比比较 offset
+     * 简单直接：还剩可滚动余量就是不在底部。
+     */
+    // 键绑定会话 id: 上个会话里停掉的跟随不该带进新会话
+    var autoScroll by remember(currentConversationId) { mutableStateOf(true) }
+
+    /**
+     * 用户滚回底部时恢复跟随。只监听 canScrollForward 从 true 变
+     * false 的时刻——程序吸底动画的中间态不会触发恢复, 只有用户
+     * 亲手把列表拖到底(或程序动画恰好落底, 下一帧自动同步)才生效。
+     */
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.canScrollForward }
+            .distinctUntilChanged()
+            .collect { canForward ->
+                if (!canForward) autoScroll = true
+            }
+    }
+    // 用户开始手动滚动且当前不在底部: 立即停跟随。isScrollInProgress
+    // 在程序动画时也为 true, 但程序动画目标就是底部, 动画期间用户
+    // 若没插手, canScrollForward 很快变 false, 上面那个 flow 会把
+    // autoScroll 重新拉回 true——两者共同作用, 中间这一瞬的 false
+    // 不会造成可见影响
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { scrolling ->
+                if (scrolling && listState.canScrollForward) {
+                    autoScroll = false
+                }
+            }
+    }
+
     // 流式输出时最后一条消息内容会持续变化，需要一并作为滚动触发条件。
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
     LaunchedEffect(messages.size, lastContentLength) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+        if (messages.isEmpty()) return@LaunchedEffect
+        // 用户刚发出消息(最后一条来自用户): 无论之前是否停了跟随,
+        // 都强制回底——自己发的话必须出现在视野里, 否则容易误以为
+        // 发送失败。AI 回复期间的滚动仍交给 autoScroll 决定
+        val lastFromUser = messages.last().isFromUser
+        if (lastFromUser) {
+            autoScroll = true
+            listState.animateScrollToItem(messages.size)
+        } else if (autoScroll) {
+            // 索引等于消息数: 列表末尾的 bottom-anchor, 详前注释
+            listState.animateScrollToItem(messages.size)
         }
     }
 
@@ -431,6 +481,14 @@ private fun ChatContent(
                                 onRetry = { onRetry(message.id) },
                                 onLongPress = { onLongPress(message) }
                             )
+                        }
+                        // 零占位的滚动锚点。animateScrollToItem(index) 是把
+                        // index 对应项的"顶部"贴到视口顶——直接指最后一条
+                        // 消息时, 流式增长的内容会把视口钉在消息开头, 新
+                        // 增的文本在屏幕外。锚点垫在所有消息之后, 滚到它
+                        // 才是真·列表底
+                        item(key = "bottom-anchor") {
+                            Spacer(Modifier.height(1.dp))
                         }
                     }
                 }
