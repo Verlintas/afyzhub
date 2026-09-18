@@ -13,7 +13,6 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.ApiProfile
+import com.afyzfur.afyzhub.ui.components.IconKey
 import com.afyzfur.afyzhub.ui.theme.AppShapeTokens
 import org.koin.androidx.compose.koinViewModel
 
@@ -130,7 +130,7 @@ fun ApiProfileEditScreen(
                 SettingsCategoryTitle("服务提供商")
                 SettingsGroup {
                     SettingsDropdownItem(
-                        icon = Icons.Default.Language,
+                        icon = IconKey,
                         title = "提供商",
                         subtitle = "决定请求的协议格式与默认地址",
                         options = AiProvider.entries,
