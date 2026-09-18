@@ -1,7 +1,6 @@
 package com.afyzfur.afyzhub.ui.settings
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,13 +14,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,13 +31,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.afyzfur.afyzhub.domain.model.ApiProfile
-import com.afyzfur.afyzhub.ui.components.ModelIcon
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -47,8 +44,8 @@ import org.koin.androidx.compose.koinViewModel
  * 一组配置 = 一份 Key + 地址 + 模型，可自定义名称并归入分组。
  * 同一家有多个 Key（不同额度、不同中转）时不必再来回覆盖。
  *
- * 点一行即选中该组生效，点右侧箭头进入编辑。选中与编辑分开：
- * 日常用得最多的是切换，不该每次都先进详情页。
+ * 点一行即把这组设为生效，点行尾铅笔进入编辑。切换是高频操作
+ * 给整行，编辑是低频操作收进按钮。
  */
 @Composable
 fun ApiProfilesScreen(
@@ -166,11 +163,9 @@ fun ApiProfilesScreen(
 /**
  * 配置组的一行。
  *
- * 点整行进入编辑，点左侧的勾选区把这组设为生效。
- *
- * 此前是反过来的——整行选中、右侧按钮进编辑。但改 Key、换模型
- * 这些事都在编辑页里，而"仅仅切换生效组"更多是在模型选择页顺手
- * 完成的，所以把进入编辑放在整行这个更大的点击区上。
+ * 整行点击把这组设为生效——切换是这里最高频的操作；编辑收进
+ * 行尾的铅笔按钮。生效状态只用一个单选圆点表达，不再叠加
+ * 背景高亮、多重对勾这些视觉噪音。
  */
 @Composable
 private fun ProfileRow(
@@ -179,46 +174,29 @@ private fun ProfileRow(
     onSelect: () -> Unit,
     onEdit: () -> Unit
 ) {
-    // 生效组整行高亮（背景 + 指示条），而不是只在最左侧放一个勾：
-    // 多组并排时一眼扫不出谁在生效，加上高亮后视线可以直接落在它上面
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onEdit)
-            .background(
-                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
-                else Color.Transparent
-            )
-            .padding(top = 8.dp, bottom = 8.dp, start = 8.dp, end = 16.dp)
+            .clickable(onClick = onSelect)
+            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ModelIcon(modelName = profile.effectiveModel, size = 22.dp)
-                Spacer(Modifier.size(10.dp))
-                Text(
-                    text = profile.displayName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                if (selected) {
-                    Spacer(Modifier.size(6.dp))
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "已生效",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.size(2.dp))
+        RadioButton(
+            selected = selected,
+            // 点击由整行承接：按钮自身不再响应，避免一行出现两个涟漪
+            onClick = null
+        )
+        Spacer(Modifier.size(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = profile.displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 // Key 是否填过比 Key 本身更有用，列表里不该露出明文
                 text = buildString {
@@ -232,29 +210,17 @@ private fun ProfileRow(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 32.dp)
+                overflow = TextOverflow.Ellipsis
             )
         }
-        // 切换生效组：日常高频操作给整列图标按钮
-        IconButton(onClick = onSelect, modifier = Modifier.size(36.dp)) {
+        // 编辑是低频操作，收成图标按钮，不占整行的点击区
+        IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
             Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = if (selected) "已生效" else "设为生效",
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant
-                },
+                imageVector = Icons.Default.Edit,
+                contentDescription = "编辑",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
         }
-        // 箭头只作提示，点击由整行承接
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
     }
 }

@@ -3,6 +3,7 @@ package com.afyzfur.afyzhub.ui.settings
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -142,9 +142,9 @@ fun ModelSelectionSection(
 /**
  * 模型行。
  *
- * 勾选标记只标"当前使用"的那一个：所有已选模型都打勾时，分不清
- * 哪个正在生效。整行点击切换当前模型，尾部 ✕ 移出已选列表——
- * 把"切换"与"移除"拆开，此前点当前模型移除需要两次点击。
+ * 当前使用的模型用加深背景加粗标记——不放对勾，勾选符号在
+ * 多个已选模型并存时反而分不清"已选"与"在用"。整行点击切换
+ * 当前模型，尾部 ✕ 一步移出已选列表。
  */
 @Composable
 private fun ModelRow(
@@ -166,19 +166,11 @@ private fun ModelRow(
         Text(
             text = model,
             style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        if (isCurrent) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "当前使用",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            if (onRemove != null) Spacer(Modifier.width(4.dp))
-        }
         if (onRemove != null) {
             Icon(
                 imageVector = Icons.Default.Close,
