@@ -1,6 +1,7 @@
 package com.afyzfur.afyzhub.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -177,64 +179,75 @@ private fun ProfileRow(
     onSelect: () -> Unit,
     onEdit: () -> Unit
 ) {
-    // clickable 加在最外层：此前它在内层的 weight(1f) 那个 Row 上，
-    // 右侧箭头落在可点区域之外——涟漪到箭头前就断了，点箭头也没反应。
-    // 勾选区的 IconButton 在这一层之内，它自己的点击会先被消费掉，
-    // 因此不会连带触发进入编辑
+    // 生效组整行高亮（背景 + 指示条），而不是只在最左侧放一个勾：
+    // 多组并排时一眼扫不出谁在生效，加上高亮后视线可以直接落在它上面
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onEdit)
-            .padding(top = 12.dp, bottom = 12.dp)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+                else Color.Transparent
+            )
+            .padding(top = 8.dp, bottom = 8.dp, start = 8.dp, end = 16.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 8.dp)
         ) {
-            // 勾选区单独可点，用来切换生效组；整行则是进入编辑
-            IconButton(onClick = onSelect, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = if (selected) "已生效" else "设为生效",
-                    tint = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    },
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Spacer(Modifier.size(8.dp))
-            ModelIcon(modelName = profile.effectiveModel, size = 22.dp)
-            Spacer(Modifier.size(12.dp))
-            Column(modifier = Modifier.weight(1f, fill = false)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ModelIcon(modelName = profile.effectiveModel, size = 22.dp)
+                Spacer(Modifier.size(10.dp))
                 Text(
                     text = profile.displayName,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-                Text(
-                    // Key 是否填过比 Key 本身更有用，列表里不该露出明文
-                    text = buildString {
-                        append(profile.effectiveModel)
-                        if (profile.apiKey.isBlank()) append("　未填 Key")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (profile.apiKey.isBlank()) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (selected) {
+                    Spacer(Modifier.size(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "已生效",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
+            Spacer(Modifier.size(2.dp))
+            Text(
+                // Key 是否填过比 Key 本身更有用，列表里不该露出明文
+                text = buildString {
+                    append(profile.effectiveModel)
+                    if (profile.apiKey.isBlank()) append("　未填 Key")
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (profile.apiKey.isBlank()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 32.dp)
+            )
+        }
+        // 切换生效组：日常高频操作给整列图标按钮
+        IconButton(onClick = onSelect, modifier = Modifier.size(36.dp)) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = if (selected) "已生效" else "设为生效",
+                tint = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                },
+                modifier = Modifier.size(18.dp)
+            )
         }
         // 箭头只作提示，点击由整行承接
         Icon(
@@ -243,6 +256,5 @@ private fun ProfileRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )
-        Spacer(Modifier.size(16.dp))
     }
 }

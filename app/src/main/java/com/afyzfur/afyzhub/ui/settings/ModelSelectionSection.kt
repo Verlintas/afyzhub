@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -62,23 +63,18 @@ fun ModelSelectionSection(
                 val isCurrent = model == profile.model
                 ModelRow(
                     model = model,
-                    isSelected = true,
                     isCurrent = isCurrent,
-                    onClick = {
-                        if (isCurrent) {
-                            // 当前模型行：点击移出已选，最后一个不可删
-                            if (selected.size > 1) {
-                                val newSelected = selected.filterNot { it == model }
-                                onChange(profile.copy(
-                                    model = newSelected.first(),
-                                    selectedModels = newSelected
-                                ))
-                            }
-                        } else {
-                            // 非当前的已选行：点击切为当前使用
-                            onChange(profile.copy(model = model))
+                    onClick = { onChange(profile.copy(model = model)) },
+                    onRemove = if (selected.size > 1) {
+                        { 
+                            val newSelected = selected.filterNot { it == model }
+                            // 删的是当前模型时切到剩下的第一个
+                            onChange(profile.copy(
+                                model = if (isCurrent) newSelected.first() else profile.model,
+                                selectedModels = newSelected
+                            ))
                         }
-                    }
+                    } else null
                 )
             }
             
@@ -113,7 +109,6 @@ fun ModelSelectionSection(
             availablePages.getOrNull(currentAvailablePage)?.forEach { model ->
                 ModelRow(
                     model = model,
-                    isSelected = false,
                     isCurrent = false,
                     onClick = {
                         // 加入已选列表的同时切为当前使用：从可用区点一个
@@ -144,12 +139,19 @@ fun ModelSelectionSection(
     }
 }
 
+/**
+ * 模型行。
+ *
+ * 勾选标记只标"当前使用"的那一个：所有已选模型都打勾时，分不清
+ * 哪个正在生效。整行点击切换当前模型，尾部 ✕ 移出已选列表——
+ * 把"切换"与"移除"拆开，此前点当前模型移除需要两次点击。
+ */
 @Composable
 private fun ModelRow(
     model: String,
-    isSelected: Boolean,
     isCurrent: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRemove: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -168,12 +170,23 @@ private fun ModelRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        if (isSelected) {
+        if (isCurrent) {
             Icon(
                 imageVector = Icons.Default.Check,
-                contentDescription = "已选择",
+                contentDescription = "当前使用",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
+            )
+            if (onRemove != null) Spacer(Modifier.width(4.dp))
+        }
+        if (onRemove != null) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "移除",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(onClick = onRemove)
             )
         }
     }
