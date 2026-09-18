@@ -368,9 +368,18 @@ class ChatRepositoryImpl(
         val usable = history.filter {
             it.id == currentMessageId || it.status == Constants.STATUS_SUCCESS
         }
-        return usable
+        val turns = usable
             .takeLast(Constants.MAX_CONTEXT_MESSAGES)
             .map { ChatTurn(role = it.role, content = it.content) }
+
+        // 系统提示词注入在对话最前：约束是"这个助手是什么样"，
+        // 属于所有轮次的前置条件，放在历史消息之后会失去效力
+        val systemPrompt = settingsProvider.current().systemPrompt.trim()
+        return if (systemPrompt.isEmpty()) {
+            turns
+        } else {
+            listOf(ChatTurn(role = "system", content = systemPrompt)) + turns
+        }
     }
 
     private suspend fun touchConversation(conversationId: Long) {

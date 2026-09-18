@@ -57,8 +57,6 @@ import org.koin.androidx.compose.koinViewModel
 fun ChatScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToProvider: () -> Unit,
-    /** 打开纯模型切换页 */
-    onNavigateToModelPicker: () -> Unit,
     apiProfilesViewModel: ApiProfilesViewModel = koinViewModel(),
     hostViewModel: ChatHostViewModel = koinViewModel(),
     viewModel: ChatViewModel = koinViewModel()

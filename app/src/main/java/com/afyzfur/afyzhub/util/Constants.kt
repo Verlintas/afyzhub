@@ -62,6 +62,9 @@ object Constants {
     const val KEY_INPUT_BAR_DEEP_SEE_THROUGH = "chat_input_bar_deep_see_through"
     const val KEY_WEB_SEARCH_ENABLED = "web_search_enabled"
 
+    /** 系统提示词。全局项，每次发送时注入对话头部 */
+    const val KEY_SYSTEM_PROMPT = "system_prompt"
+
     /** 输入栏是否悬浮样式（四周留边、四角全圆） */
     const val KEY_INPUT_BAR_FLOATING = "chat_input_bar_floating"
 

@@ -29,6 +29,7 @@ import com.afyzfur.afyzhub.ui.components.IconPalette
 import com.afyzfur.afyzhub.ui.components.IconTextLines
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,10 @@ fun SettingsHomeScreen(
     val activeProfile = profileStore.active
     val streamEnabled by settingsViewModel.streamEnabled.collectAsState()
     val webSearchEnabled by settingsViewModel.webSearchEnabled.collectAsState()
+    val systemPrompt by settingsViewModel.systemPrompt.collectAsState()
+
+    // 首次进入回填已保存的系统提示词
+    LaunchedEffect(Unit) { settingsViewModel.loadSystemPrompt() }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -156,6 +161,17 @@ fun SettingsHomeScreen(
                         subtitle = "启用模型原生联网搜索（当前仅 Gemini 支持）",
                         checked = webSearchEnabled,
                         onCheckedChange = settingsViewModel::updateWebSearchEnabled
+                    )
+                    SettingsItemDivider()
+                    SettingsTextFieldItem(
+                        title = "系统提示词",
+                        value = systemPrompt,
+                        onValueChange = settingsViewModel::updateSystemPrompt,
+                        placeholder = "留空则不注入。例如：你是一个严谨的技术助手",
+                        // 每次改动直接落盘：和 API 配置页同样的即时写回，
+                        // 不做防抖——DataStore 写入本身是串行的，中间态
+                        // 被后续值覆盖即可
+                        singleLine = false
                     )
                 }
 

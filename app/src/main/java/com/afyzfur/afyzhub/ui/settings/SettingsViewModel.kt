@@ -35,6 +35,9 @@ class SettingsViewModel(
     private val _webSearchEnabled = MutableStateFlow(false)
     val webSearchEnabled: StateFlow<Boolean> = _webSearchEnabled.asStateFlow()
 
+    private val _systemPrompt = MutableStateFlow("")
+    val systemPrompt: StateFlow<String> = _systemPrompt.asStateFlow()
+
     /** 当前提供商的可用模型，来自缓存或最近一次拉取。 */
     private val _availableModels = MutableStateFlow<List<String>>(emptyList())
     val availableModels: StateFlow<List<String>> = _availableModels.asStateFlow()
@@ -205,6 +208,20 @@ class SettingsViewModel(
     fun updateWebSearchEnabled(value: Boolean) {
         _webSearchEnabled.value = value
         viewModelScope.launch { settingsRepository.setWebSearchEnabled(value) }
+    }
+
+    /** 进入设置页时回填已保存的系统提示词 */
+    fun loadSystemPrompt() {
+        if (_systemPrompt.value.isEmpty()) {
+            viewModelScope.launch {
+                _systemPrompt.value = settingsRepository.currentSystemPrompt()
+            }
+        }
+    }
+
+    fun updateSystemPrompt(value: String) {
+        _systemPrompt.value = value
+        viewModelScope.launch { settingsRepository.setSystemPrompt(value) }
     }
 
     fun updateApiKey(value: String) {

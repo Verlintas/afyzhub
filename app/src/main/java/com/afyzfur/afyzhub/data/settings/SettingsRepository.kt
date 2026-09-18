@@ -47,7 +47,14 @@ data class AppSettings(
      * 临时选择，用户会频繁在输入栏切换，而不是某组配置的固定属性。
      */
     val thinkingEffort: ThinkingEffort = ThinkingEffort.DEFAULT,
-    val webSearchEnabled: Boolean = false
+    val webSearchEnabled: Boolean = false,
+    /**
+     * 系统提示词。空串表示不注入。
+     *
+     * 全局项而非按配置组：它描述"我希望这个助手是什么样"，
+     * 与用哪家的 API 无关。
+     */
+    val systemPrompt: String = ""
 )
 
 /**
@@ -115,6 +122,7 @@ class SettingsRepository(
     private val inputBarDeepSeeThroughKey =
         booleanPreferencesKey(Constants.KEY_INPUT_BAR_DEEP_SEE_THROUGH)
     private val webSearchEnabledKey = booleanPreferencesKey(Constants.KEY_WEB_SEARCH_ENABLED)
+    private val systemPromptKey = stringPreferencesKey(Constants.KEY_SYSTEM_PROMPT)
     private val logRetentionKey = stringPreferencesKey(Constants.KEY_LOG_RETENTION)
     private val logEnabledKey = booleanPreferencesKey(Constants.KEY_LOG_ENABLED)
 
@@ -237,7 +245,9 @@ class SettingsRepository(
                 model = active.effectiveModel,
                 baseUrl = normalizeBaseUrl(active.effectiveBaseUrl, active.provider),
                 streamEnabled = prefs[streamKey] ?: true,
-                thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey])
+                thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey]),
+                webSearchEnabled = prefs[webSearchEnabledKey] ?: false,
+                systemPrompt = prefs[systemPromptKey].orEmpty()
             )
         } else {
             val provider = AiProvider.fromId(prefs[providerKey])
@@ -249,7 +259,9 @@ class SettingsRepository(
                 model = readModel(prefs, provider),
                 baseUrl = readBaseUrl(prefs, provider),
                 streamEnabled = prefs[streamKey] ?: true,
-                thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey])
+                thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey]),
+                webSearchEnabled = prefs[webSearchEnabledKey] ?: false,
+                systemPrompt = prefs[systemPromptKey].orEmpty()
             )
         }
     }
@@ -467,6 +479,13 @@ class SettingsRepository(
     suspend fun setWebSearchEnabled(enabled: Boolean) {
         dataStore.edit { it[webSearchEnabledKey] = enabled }
     }
+
+    suspend fun setSystemPrompt(prompt: String) {
+        dataStore.edit { it[systemPromptKey] = prompt }
+    }
+
+    suspend fun currentSystemPrompt(): String =
+        dataStore.data.first()[systemPromptKey].orEmpty()
 
     /**
      * 记录图片路径并递增版本号。
