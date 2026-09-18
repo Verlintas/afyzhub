@@ -50,7 +50,11 @@ class GenerateTitleUseCase(
      * 返回 null 表示生成失败，调用方保持原样即可——总结缺失时
      * 界面会退回显示末条消息，不需要兜底文案。
      */
-    suspend fun summary(userMessage: String, assistantReply: String): String? {
+    suspend fun summary(
+        userMessage: String,
+        assistantReply: String,
+        previousSummary: String? = null
+    ): String? {
         if (userMessage.isBlank() || assistantReply.isBlank()) return null
 
         return runCatching {
@@ -66,7 +70,15 @@ class GenerateTitleUseCase(
                     ChatTurn(
                         role = "user",
                         content = buildString {
-                            append("问：")
+                            // 有旧总结时做合并：否则多轮对话的总结
+                            // 永远只反映最后一轮，与标题（始终关于
+                            // 第一轮）完全脱节
+                            previousSummary?.takeIf { it.isNotBlank() }?.let {
+                                append("此前的会话总结：")
+                                append(it)
+                                append("\n\n")
+                            }
+                            append("新的一轮问答：\n问：")
                             append(userMessage.take(PROMPT_INPUT_LIMIT))
                             append("\n答：")
                             append(answer.take(PROMPT_INPUT_LIMIT))
@@ -97,11 +109,12 @@ class GenerateTitleUseCase(
         """.trimIndent()
 
         private val SUMMARY_PROMPT = """
-            你是一个对话摘要生成器。根据一轮问答，生成一句话中文摘要。
+            你是一个对话摘要生成器。根据已有总结与新的一轮问答，生成一句话中文摘要。
             要求：
             1. 不超过 25 个字
             2. 只输出摘要本身，不要引号、句号、前缀或任何解释
-            3. 说明这轮问答解决了什么，而不是复述内容
+            3. 摘要要覆盖整个会话的主题与进展，而不是只描述最新一轮
+            4. 若提供了已有总结，在其基础上合并新信息；无则概括这轮问答
         """.trimIndent()
 
     }

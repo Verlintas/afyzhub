@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -266,7 +267,11 @@ fun ChatScreen(
     if (showModelPicker) {
         ModelPickerSheet(
             viewModel = apiProfilesViewModel,
-            onDismiss = { showModelPicker = false }
+            onDismiss = { showModelPicker = false },
+            onManageProfiles = {
+                showModelPicker = false
+                onNavigateToProvider()
+            }
         )
     }
 }
@@ -516,7 +521,8 @@ private fun ChatContent(
 /* v0.3.5-dev: 输入栏模型选择由全屏页改为底部半屏选择器 */
 private fun ModelPickerSheet(
     viewModel: ApiProfilesViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onManageProfiles: () -> Unit
 ) {
     val store by viewModel.store.collectAsState()
     val activeId = store.active?.id
@@ -525,12 +531,28 @@ private fun ModelPickerSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ) {
-        Text(
-            text = "选择模型",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+        ) {
+            Text(
+                text = "选择模型",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onManageProfiles) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("管理配置", style = MaterialTheme.typography.labelMedium)
+            }
+        }
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp)

@@ -1,6 +1,7 @@
 package com.afyzfur.afyzhub.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,23 +58,34 @@ fun ModelSelectionSection(
             val currentSelectedPage = selectedPage.coerceIn(0, (selectedPages.size - 1).coerceAtLeast(0))
             
             selectedPages.getOrNull(currentSelectedPage)?.forEach { model ->
+                val isCurrent = model == profile.model
                 ModelRow(
                     model = model,
                     isSelected = true,
-                    isCurrent = model == profile.model,
+                    isCurrent = isCurrent,
                     onClick = {
-                        if (selected.size > 1) {
-                            val newSelected = selected.filterNot { it == model }
-                            val newModel = if (profile.model == model) newSelected.first() else profile.model
-                            onChange(profile.copy(
-                                model = newModel,
-                                selectedModels = newSelected
-                            ))
+                        if (isCurrent) {
+                            // 当前模型行：点击移出已选，最后一个不可删
+                            if (selected.size > 1) {
+                                val newSelected = selected.filterNot { it == model }
+                                onChange(profile.copy(
+                                    model = newSelected.first(),
+                                    selectedModels = newSelected
+                                ))
+                            }
+                        } else {
+                            // 非当前的已选行：点击切为当前使用
+                            onChange(profile.copy(model = model))
                         }
                     }
                 )
             }
             
+            // 最后一页不满时补齐高度，翻页时分页控件不会上跳
+            val selRemainder = selected.size % PAGE_SIZE
+            if (selectedPages.size > 1 && selRemain != 0 && currentSelectedPage == selectedPages.size - 1) {
+                Spacer(Modifier.height((PAGE_SIZE - selRemain) * 48.dp))
+            }
             if (selectedPages.size > 1) {
                 PaginationControls(
                     currentPage = currentSelectedPage,
@@ -103,11 +115,22 @@ fun ModelSelectionSection(
                     isSelected = false,
                     isCurrent = false,
                     onClick = {
-                        onChange(profile.copy(selectedModels = selected + model))
+                        // 加入已选列表的同时切为当前使用：从可用区点一个
+                        // 模型，意图几乎必然是"用它"，只入列不切换会让人
+                        // 以为换模型没生效
+                        onChange(profile.copy(
+                            selectedModels = selected + model,
+                            model = model
+                        ))
                     }
                 )
             }
             
+            // 同上：最后一页补齐，避免翻页时按钮乱动
+            val availRemainder = available.size % PAGE_SIZE
+            if (availablePages.size > 1 && availRemainder != 0 && currentAvailablePage == availablePages.size - 1) {
+                Spacer(Modifier.height((PAGE_SIZE - availRemainder) * 48.dp))
+            }
             if (availablePages.size > 1) {
                 PaginationControls(
                     currentPage = currentAvailablePage,
@@ -131,7 +154,7 @@ private fun ModelRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
+            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

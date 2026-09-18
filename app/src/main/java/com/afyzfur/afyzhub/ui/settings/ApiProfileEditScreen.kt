@@ -276,7 +276,7 @@ private fun TestResultRow(result: TestResult) {
         is TestResult.Success -> Triple(
             MaterialTheme.colorScheme.primary,
             "连接正常",
-            "${result.model} · ${result.elapsedMs} ms"
+            "${result.model} · 响应 ${result.elapsedMs} ms · 回复「${result.preview.take(20)}」"
         )
         is TestResult.Failure -> Triple(
             MaterialTheme.colorScheme.error,

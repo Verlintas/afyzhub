@@ -192,13 +192,23 @@ class ChatViewModel(
         needTitle: Boolean
     ) {
         viewModelScope.launch {
-            if (needTitle) {
-                val title = generateTitleUseCase.title(userText)
-                repository.renameConversation(conversationId, title)
-            }
-            generateTitleUseCase.summary(userText, replyContent)?.let { summary ->
+            // 标题与总结各自独立请求，并行发出：串行会让总结
+            // 白等一次网络往返，两件事本无依赖
+            val titleJob = if (needTitle) {
+                launch {
+                    val title = generateTitleUseCase.title(userText)
+                    repository.renameConversation(conversationId, title)
+                }
+            } else null
+
+            // 先取已有总结，新总结在其基础上合并——否则多轮
+            // 对话的总结只反映最后一轮
+            val previous = repository.getConversationSummary(conversationId)
+            generateTitleUseCase.summary(userText, replyContent, previous)?.let { summary ->
                 repository.updateSummary(conversationId, summary)
             }
+
+            titleJob?.join()
         }
     }
 

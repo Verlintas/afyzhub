@@ -92,6 +92,9 @@ interface ChatRepository {
      */
     suspend fun updateSummary(conversationId: Long, summary: String)
 
+    /** 读取当前总结。生成新总结时带上旧的，合并成覆盖全程的概括 */
+    suspend fun getConversationSummary(conversationId: Long): String?
+
     /**
      * 以下几个与 [updateSummary] 同理，都不动 updatedAt——
      * 置顶、加星、写简介、换分组都不是"对话有了新进展"。

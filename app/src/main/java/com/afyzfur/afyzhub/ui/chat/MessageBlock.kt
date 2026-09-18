@@ -203,7 +203,11 @@ private fun MessageBody(
 
     // 思考进行中而正文尚未开始时不渲染气泡，否则会出现一个空容器。
     // 这正是截图里那条空白圆角块的来源
-    if (parsed != null && parsed.answer.isBlank() && parsed.hasReasoning) {
+    //
+    // 等待首 token 时（无思考、正文仍为空）同样不渲染：等 AI 开口
+    // 之前界面上不该有任何占位框，进度由输入栏的阶段文字说明
+    val answerText = parsed?.answer ?: message.content
+    if (message.isSending && answerText.isBlank() && !fromUser) {
         return
     }
 

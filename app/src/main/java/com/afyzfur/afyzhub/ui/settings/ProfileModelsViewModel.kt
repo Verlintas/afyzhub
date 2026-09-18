@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  * 这个数字能帮用户判断是否值得继续用这家。
  */
 sealed interface TestResult {
-    data class Success(val model: String, val elapsedMs: Long) : TestResult
+    data class Success(val model: String, val elapsedMs: Long, val preview: String = "") : TestResult
     data class Failure(val reason: String) : TestResult
 }
 
@@ -125,9 +125,12 @@ class ProfileModelsViewModel(
                     // 请求成功但没有内容，多见于模型名不被服务端接受
                     TestResult.Failure("请求成功但未返回内容，请检查模型名是否正确")
                 } else {
+                    // 带回复预览：能对话不代表回复正常，看一眼内容
+                    // 就知道模型是不是答非所问
                     TestResult.Success(
                         model = probe.model,
-                        elapsedMs = elapsed
+                        elapsedMs = elapsed,
+                        preview = result.content.trim()
                     )
                 }
             } catch (e: Exception) {

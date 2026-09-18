@@ -387,6 +387,9 @@ class ChatRepositoryImpl(
         conversationDao.updateSummary(conversationId, trimmed)
     }
 
+    override suspend fun getConversationSummary(conversationId: Long): String? =
+        conversationDao.getConversationById(conversationId)?.summary?.takeIf { it.isNotBlank() }
+
     override suspend fun renameConversation(conversationId: Long, title: String) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
