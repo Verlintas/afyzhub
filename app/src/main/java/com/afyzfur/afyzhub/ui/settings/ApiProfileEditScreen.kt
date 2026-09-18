@@ -1,35 +1,25 @@
 package com.afyzfur.afyzhub.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import com.afyzfur.afyzhub.ui.components.ModelIcon
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -38,12 +28,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.ApiProfile
@@ -63,6 +51,7 @@ import org.koin.androidx.compose.koinViewModel
 fun ApiProfileEditScreen(
     profileId: String,
     onNavigateBack: () -> Unit,
+    onNavigateToModels: () -> Unit,
     viewModel: ApiProfilesViewModel = koinViewModel(),
     modelsViewModel: ProfileModelsViewModel = koinViewModel()
 ) {
@@ -92,15 +81,11 @@ fun ApiProfileEditScreen(
         return
     }
 
-    val loading by modelsViewModel.loading.collectAsState()
-    val error by modelsViewModel.error.collectAsState()
     val testing by modelsViewModel.testing.collectAsState()
     val testResult by modelsViewModel.testResult.collectAsState()
 
     // 换到另一组配置时清掉上一组的测试结果，否则会被误读成当前组的
     LaunchedEffect(profileId) { modelsViewModel.clearTestResult() }
-    var pageIndex by remember(profileId) { mutableIntStateOf(0) }
-
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxSize()
@@ -144,18 +129,19 @@ fun ApiProfileEditScreen(
 
                 SettingsCategoryTitle("服务提供商")
                 SettingsGroup {
-                    AiProvider.entries.forEachIndexed { index, entry ->
-                        if (index > 0) SettingsItemDivider()
-                        SettingsRadioItem(
-                            title = entry.displayName,
-                            selected = entry.id == profile.providerId,
-                            onClick = {
-                                viewModel.updateProfile(
-                                    profile.copy(providerId = entry.id)
-                                )
-                            }
-                        )
-                    }
+                    SettingsDropdownItem(
+                        icon = Icons.Default.Language,
+                        title = "提供商",
+                        subtitle = "决定请求的协议格式与默认地址",
+                        options = AiProvider.entries,
+                        selected = profile.provider,
+                        label = { it.displayName },
+                        onSelect = { entry ->
+                            viewModel.updateProfile(
+                                profile.copy(providerId = entry.id)
+                            )
+                        }
+                    )
                 }
 
                 SettingsCategoryTitle("接口配置")
@@ -206,49 +192,18 @@ fun ApiProfileEditScreen(
                     }
                 }
 
+                // 模型相关的编辑(改名、拉列表、挑选)整体收进二级页：
+                // 编辑页曾经六块纵向堆叠, 滚下来信息量过载。这里只留
+                // 一个入口行, 副标题直接显示当前模型, 不进二级页也能
+                // 看到生效值
                 SettingsCategoryTitle("模型")
                 SettingsGroup {
-                    SettingsTextFieldItem(
-                        // 切换配置组时重建输入框，否则会留着上一组的值
-                        identityKey = profileId,
-                        title = "模型名称",
-                        value = profile.model,
-                        onValueChange = { viewModel.updateProfile(profile.copy(model = it)) },
-                        placeholder = "留空则使用 ${profile.provider.fallbackModel}"
+                    SettingsNavItem(
+                        icon = Icons.Default.PlayArrow,
+                        title = "模型管理",
+                        subtitle = profile.effectiveModel,
+                        onClick = onNavigateToModels
                     )
-
-                    SettingsItemDivider()
-                    ModelFetchRow(
-                        loading = loading,
-                        hasModels = profile.cachedModels.isNotEmpty(),
-                        onRefresh = {
-                            modelsViewModel.fetchModels(profile) { models ->
-                                viewModel.updateProfile(
-                                    profile.copy(cachedModels = models)
-                                )
-                                pageIndex = 0
-                            }
-                        }
-                    )
-
-                    error?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                        )
-                    }
-                }
-
-                if (profile.cachedModels.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
-                    SettingsGroup {
-                        ModelSelectionSection(
-                            profile = profile,
-                            onChange = viewModel::updateProfile
-                        )
-                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -313,109 +268,6 @@ private fun TestResultRow(result: TestResult) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-/** 拉取模型列表的操作行 */
-@Composable
-private fun ModelFetchRow(
-    loading: Boolean,
-    hasModels: Boolean,
-    onRefresh: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !loading, onClick = onRefresh)
-            .padding(horizontal = 20.dp, vertical = 14.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.size(12.dp))
-        Text(
-            text = if (hasModels) "刷新模型列表" else "从服务端获取模型列表",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f)
-        )
-        if (loading) {
-            CircularProgressIndicator(
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
-
-/**
- * 模型列表，每项占满一行。
- *
- * 此前用 FlowRow 排胶囊，宽度随模型名长短变化：短名字的点击区只有
- * 一小块，长名字被截断看不全，找目标时还得在不规则的排布里扫视。
- * 整宽竖排让每一项的点击区一致，名字也能完整显示。
- */
-@Composable
-private fun ModelPickerList(
-    models: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        models.forEachIndexed { index, model ->
-            if (index > 0) SettingsItemDivider()
-            val isSelected = model == selected
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(model) }
-                    .background(
-                        // 选中项用淡色底而非实心主色：整宽的实心色块
-                        // 在列表里过于抢眼，压过其余内容
-                        if (isSelected) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            Color.Transparent
-                        }
-                    )
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                ModelIcon(modelName = model, size = 20.dp)
-                Spacer(Modifier.size(12.dp))
-                Text(
-                    text = model,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                    // 固定一行，过长的名字横向滑动查看。允许两行时
-                    // 每项高度会随名字长短变化，整页高度跟着变，
-                    // 「上一页 / 下一页」按钮的位置也跟着上下跳
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState())
-                )
-                if (isSelected) {
-                    Spacer(Modifier.size(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "当前使用",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
         }
     }
 }

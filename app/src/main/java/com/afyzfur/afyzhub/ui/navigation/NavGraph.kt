@@ -12,6 +12,7 @@ import com.afyzfur.afyzhub.ui.settings.ChatAppearanceSettingsScreen
 import com.afyzfur.afyzhub.ui.settings.MessageDisplaySettingsScreen
 import com.afyzfur.afyzhub.ui.settings.ApiProfileEditScreen
 import com.afyzfur.afyzhub.ui.settings.ApiProfilesScreen
+import com.afyzfur.afyzhub.ui.settings.ApiProfileModelsScreen
 import com.afyzfur.afyzhub.ui.settings.QuickPromptsSettingsScreen
 import com.afyzfur.afyzhub.ui.settings.RequestLogScreen
 import com.afyzfur.afyzhub.ui.settings.SettingsHomeScreen
@@ -33,6 +34,11 @@ sealed class Screen(val route: String) {
     /** 单组配置的编辑页，路径参数为组 id */
     object ApiProfileEdit : Screen("settings/api_profiles/{profileId}") {
         fun routeFor(profileId: String) = "settings/api_profiles/$profileId"
+    }
+
+    /** 配置组的模型管理页，从编辑页进入 */
+    object ApiProfileModels : Screen("settings/api_profiles/{profileId}/models") {
+        fun routeFor(profileId: String) = "settings/api_profiles/$profileId/models"
     }
 
     object AppearanceSettings : Screen("settings/appearance")
@@ -103,6 +109,17 @@ fun NavGraph() {
             // id 缺失时给空串，编辑页会显示"已被删除"而不是崩掉
             val id = entry.arguments?.getString("profileId").orEmpty()
             ApiProfileEditScreen(
+                profileId = id,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToModels = {
+                    navController.navigate(Screen.ApiProfileModels.routeFor(id))
+                }
+            )
+        }
+
+        composable(Screen.ApiProfileModels.route) { entry ->
+            val id = entry.arguments?.getString("profileId").orEmpty()
+            ApiProfileModelsScreen(
                 profileId = id,
                 onNavigateBack = { navController.popBackStack() }
             )
