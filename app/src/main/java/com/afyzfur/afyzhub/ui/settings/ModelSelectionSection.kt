@@ -83,8 +83,8 @@ fun ModelSelectionSection(
             
             // 最后一页不满时补齐高度，翻页时分页控件不会上跳
             val selRemainder = selected.size % PAGE_SIZE
-            if (selectedPages.size > 1 && selRemain != 0 && currentSelectedPage == selectedPages.size - 1) {
-                Spacer(Modifier.height((PAGE_SIZE - selRemain) * 48.dp))
+            if (selectedPages.size > 1 && selRemainder != 0 && currentSelectedPage == selectedPages.size - 1) {
+                Spacer(Modifier.height((PAGE_SIZE - selRemainder) * 48.dp))
             }
             if (selectedPages.size > 1) {
                 PaginationControls(
