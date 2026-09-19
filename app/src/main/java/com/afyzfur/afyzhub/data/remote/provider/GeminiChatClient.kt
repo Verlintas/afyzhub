@@ -1,5 +1,6 @@
 package com.afyzfur.afyzhub.data.remote.provider
 
+import com.afyzfur.afyzhub.domain.model.ThinkingEffort
 import com.afyzfur.afyzhub.data.log.RequestLogContext
 import com.afyzfur.afyzhub.data.settings.AppSettings
 import com.afyzfur.afyzhub.util.Constants
@@ -120,14 +121,27 @@ class GeminiChatClient(
         // Gemini 用 thinkingBudget 给 token 预算，并需要显式打开
         // includeThoughts 才会把思考内容返回——只给预算的话模型会思考，
         // 但过程完全看不到，用户只会觉得变慢了
-        val budget = settings.thinkingEffort.tokenBudget
-        val config = budget?.let {
-            GenerationConfig(
-                thinkingConfig = ThinkingConfig(
-                    thinkingBudget = it,
-                    includeThoughts = true
+        //
+        // OFF 必须显式发 thinkingBudget = 0：2.5 系模型默认开思考，
+        // 整个 config 不发等于沿用默认，"关闭"永远不生效。0 是官方
+        // 文档的关闭值；-1 是动态预算，不是关闭
+        val effort = settings.thinkingEffort
+        val config = when {
+            effort == ThinkingEffort.OFF ->
+                GenerationConfig(
+                    thinkingConfig = ThinkingConfig(
+                        thinkingBudget = 0,
+                        includeThoughts = false
+                    )
                 )
-            )
+            effort.tokenBudget != null ->
+                GenerationConfig(
+                    thinkingConfig = ThinkingConfig(
+                        thinkingBudget = effort.tokenBudget,
+                        includeThoughts = true
+                    )
+                )
+            else -> null
         }
 
         return GenerateRequest(
@@ -166,9 +180,8 @@ class GeminiChatClient(
     /**
      * Gemini 的思考配置。
      *
-     * thinkingBudget 为 0 表示关闭，但本应用关闭思考时整个
-     * generationConfig 都不发——部分模型（如 2.5 Pro）不接受
-     * 把预算设成 0，会直接报错。
+     * thinkingBudget = 0 是官方文档的关闭值；0 之外的正数是预算，
+     * -1 是动态预算。includeThoughts 控制是否把思考内容随回复返回。
      */
     @Serializable
     private data class Tool(val googleSearch: GoogleSearch? = null)
