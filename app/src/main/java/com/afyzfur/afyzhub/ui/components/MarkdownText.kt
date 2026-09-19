@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.LinkStyles
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -249,7 +248,7 @@ private fun List<InlineSpan>.toAnnotatedString(
                     withLink(
                         LinkAnnotation.Clickable(
                             tag = url,
-                            styles = LinkStyles(
+                            styles = LinkAnnotation.LinkStyles(
                                 SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
                             ),
                             linkInteractionListener = { onLinkClick(url) }
