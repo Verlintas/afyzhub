@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.ThinkingEffort
 import com.afyzfur.afyzhub.ui.theme.AppShapeTokens
 
@@ -37,6 +38,8 @@ import com.afyzfur.afyzhub.ui.theme.AppShapeTokens
 @Composable
 fun ThinkingEffortSheet(
     current: ThinkingEffort,
+    model: String,
+    provider: AiProvider,
     onSelect: (ThinkingEffort) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -57,7 +60,7 @@ fun ThinkingEffortSheet(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "思考会增加耗时与费用，且并非所有模型都支持",
+                text = "当前模型：$model。思考会增加耗时与费用，不支持的档位已置灰",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp)
@@ -77,6 +80,7 @@ fun ThinkingEffortSheet(
                             EffortCard(
                                 effort = effort,
                                 selected = effort == current,
+                                enabled = effort.supportsModel(provider, model),
                                 onClick = {
                                     onSelect(effort)
                                     onDismiss()
@@ -101,11 +105,13 @@ fun ThinkingEffortSheet(
 private fun EffortCard(
     effort: ThinkingEffort,
     selected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         color = if (selected) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {
@@ -134,13 +140,16 @@ private fun EffortCard(
             Text(
                 text = effort.label,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.outline
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = effort.hint(),
+                text = if (enabled) effort.hint() else "当前模型不支持",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center
             )
         }

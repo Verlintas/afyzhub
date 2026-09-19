@@ -38,6 +38,7 @@ import androidx.compose.ui.text.AnnotatedString
 import com.afyzfur.afyzhub.domain.model.SendPhase
 import com.afyzfur.afyzhub.ui.components.ChatBackgroundLayer
 import com.afyzfur.afyzhub.data.settings.MessageDisplayOptions
+import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.ThinkingEffort
 import com.afyzfur.afyzhub.domain.model.Message
 import com.afyzfur.afyzhub.ui.theme.AppShapeTokens
@@ -314,6 +315,8 @@ fun ChatScreen(
     if (showEffortSheet) {
         ThinkingEffortSheet(
             current = settings.thinkingEffort,
+            model = settings.model,
+            provider = settings.provider,
             onSelect = hostViewModel::setThinkingEffort,
             onDismiss = { showEffortSheet = false }
         )
