@@ -21,11 +21,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.LinkStyles
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,7 +54,9 @@ fun MarkdownText(
      *
      * 聊天气泡里不开：那里的标题只是段落强调，放大会挤掉正文。
      */
-    documentMode: Boolean = false
+    documentMode: Boolean = false,
+    /** 链接点击回调。不传时链接仅渲染样式，不可点。 */
+    onLinkClick: ((String) -> Unit)? = null
 ) {
     val blocks = remember(text) { MarkdownParser.parse(text) }
 
@@ -78,7 +84,7 @@ fun MarkdownText(
                 )
                 Spacer(Modifier.height(8.dp))
             }
-            MarkdownBlockView(block, color, documentMode)
+            MarkdownBlockView(block, color, documentMode, onLinkClick)
         }
     }
 }
@@ -87,17 +93,18 @@ fun MarkdownText(
 private fun MarkdownBlockView(
     block: MarkdownBlock,
     color: Color,
-    documentMode: Boolean = false
+    documentMode: Boolean = false,
+    onLinkClick: ((String) -> Unit)? = null
 ) {
     when (block) {
         is MarkdownBlock.Paragraph -> Text(
-            text = block.spans.toAnnotatedString(),
+            text = block.spans.toAnnotatedString(onLinkClick ?: {}),
             color = color,
             style = MaterialTheme.typography.bodyLarge
         )
 
         is MarkdownBlock.Heading -> Text(
-            text = block.spans.toAnnotatedString(),
+            text = block.spans.toAnnotatedString(onLinkClick ?: {}),
             color = color,
             // 各级差距拉开：原先 titleMedium 与 titleSmall 只差 2sp，
             // 二级与三级标题几乎看不出层级，更新日志里的版本号
@@ -134,7 +141,7 @@ private fun MarkdownBlockView(
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = block.spans.toAnnotatedString(),
+                text = block.spans.toAnnotatedString(onLinkClick ?: {}),
                 color = color,
                 style = MaterialTheme.typography.bodyLarge
             )
@@ -150,7 +157,7 @@ private fun MarkdownBlockView(
             ) {}
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = block.spans.toAnnotatedString(),
+                text = block.spans.toAnnotatedString(onLinkClick ?: {}),
                 color = color.copy(alpha = 0.85f),
                 style = MaterialTheme.typography.bodyMedium,
                 fontStyle = FontStyle.Italic
@@ -211,9 +218,16 @@ private fun CodeBlockView(block: MarkdownBlock.CodeBlock) {
     }
 }
 
-/** 把解析出的行内片段转成 Compose 可渲染的富文本。 */
+/**
+ * 把解析出的行内片段转成 Compose 可渲染的富文本。
+ *
+ * 链接带 LinkAnnotation：点击后由调用方导航到应用内浏览器，
+ * 而非丢给系统浏览器。样式部分与旧实现一致。
+ */
 @Composable
-private fun List<InlineSpan>.toAnnotatedString(): AnnotatedString {
+private fun List<InlineSpan>.toAnnotatedString(
+    onLinkClick: (String) -> Unit
+): AnnotatedString {
     val linkColor = MaterialTheme.colorScheme.primary
     val codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest
 
@@ -231,7 +245,19 @@ private fun List<InlineSpan>.toAnnotatedString(): AnnotatedString {
                     else -> null
                 }
             )
-            withStyle(style) { append(span.text) }
+            withStyle(style) {
+                span.url?.let { url ->
+                    withLink(
+                        LinkAnnotation.Clickable(
+                            tag = url,
+                            styles = LinkStyles(
+                                SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
+                            ),
+                            linkInteractionListener = { onLinkClick(url) }
+                        )
+                    ) { append(span.text) }
+                } ?: append(span.text)
+            }
         }
     }
 }

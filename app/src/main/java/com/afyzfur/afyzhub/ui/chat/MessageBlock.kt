@@ -57,7 +57,9 @@ fun MessageBlock(
     appearance: ChatAppearance,
     providerLabel: String,
     onRetry: () -> Unit = {},
-    onLongPress: () -> Unit = {}
+    onLongPress: () -> Unit = {},
+    /** 链接点击: 导航到应用内浏览器 */
+    onLinkClick: ((String) -> Unit)? = null
 ) {
     val fromUser = message.isFromUser
     val style = if (fromUser) appearance.userBubble else appearance.assistantBubble
@@ -108,7 +110,8 @@ fun MessageBlock(
                     message = message,
                     style = style,
                     fromUser = fromUser,
-                    onLongPress = onLongPress
+                    onLongPress = onLongPress,
+                    onLinkClick = onLinkClick
                 )
             }
 
@@ -147,7 +150,8 @@ private fun MessageBody(
     message: Message,
     style: BubbleStyle,
     fromUser: Boolean,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    onLinkClick: ((String) -> Unit)? = null
 ) {
     // 只有助手回复会带思考标签，用户消息不必解析。
     // remember 以内容为键：流式输出时每个增量都会重组，
@@ -175,7 +179,8 @@ private fun MessageBody(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.onSurface
-                }
+                },
+                onLinkClick = onLinkClick
             )
         }
     }

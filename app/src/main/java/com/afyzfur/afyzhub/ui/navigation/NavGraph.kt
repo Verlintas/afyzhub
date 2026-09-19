@@ -13,6 +13,7 @@ import com.afyzfur.afyzhub.ui.settings.MessageDisplaySettingsScreen
 import com.afyzfur.afyzhub.ui.settings.ApiProfileEditScreen
 import com.afyzfur.afyzhub.ui.settings.ApiProfilesScreen
 import com.afyzfur.afyzhub.ui.settings.ApiProfileModelsScreen
+import com.afyzfur.afyzhub.ui.browser.InAppBrowserScreen
 import com.afyzfur.afyzhub.ui.settings.QuickPromptsSettingsScreen
 import com.afyzfur.afyzhub.ui.settings.RequestLogScreen
 import com.afyzfur.afyzhub.ui.settings.SettingsHomeScreen
@@ -41,6 +42,11 @@ sealed class Screen(val route: String) {
         fun routeFor(profileId: String) = "settings/api_profiles/$profileId/models"
     }
 
+    /** 应用内浏览器。URL 经 URL-encode 后作为路径参数，避免 query 串截断路由 */
+    object Browser : Screen("browser/{url}") {
+        fun routeFor(url: String) = "browser/${android.net.Uri.encode(url)}"
+    }
+
     object AppearanceSettings : Screen("settings/appearance")
     object ChatAppearanceSettings : Screen("settings/chat_appearance")
     object MessageDisplaySettings : Screen("settings/message_display")
@@ -65,6 +71,9 @@ fun NavGraph() {
                 },
                 onNavigateToProvider = {
                     navController.navigate(Screen.ApiProfiles.route)
+                },
+                onOpenBrowser = { url ->
+                    navController.navigate(Screen.Browser.routeFor(url))
                 }
             )
         }
@@ -121,6 +130,15 @@ fun NavGraph() {
             val id = entry.arguments?.getString("profileId").orEmpty()
             ApiProfileModelsScreen(
                 profileId = id,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Browser.route) { entry ->
+            val raw = entry.arguments?.getString("url").orEmpty()
+            val url = android.net.Uri.decode(raw)
+            InAppBrowserScreen(
+                initialUrl = url,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

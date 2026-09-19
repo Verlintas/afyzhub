@@ -59,6 +59,7 @@ import org.koin.androidx.compose.koinViewModel
 fun ChatScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToProvider: () -> Unit,
+    onOpenBrowser: (String) -> Unit = {},
     apiProfilesViewModel: ApiProfilesViewModel = koinViewModel(),
     hostViewModel: ChatHostViewModel = koinViewModel(),
     viewModel: ChatViewModel = koinViewModel()
@@ -258,6 +259,7 @@ fun ChatScreen(
             },
             onStop = { viewModel.stopGenerating() },
             onPickModel = { showModelPicker = true },
+            onOpenBrowser = onOpenBrowser,
             undoable = undoable,
             onUndoRemoval = { viewModel.undoRemoval() },
             onDismissUndo = { viewModel.dismissUndo() },
@@ -366,6 +368,8 @@ private fun ChatContent(
     onStop: () -> Unit,
     /** 点输入栏左下角的模型区域 */
     onPickModel: () -> Unit,
+    /** 打开应用内浏览器 */
+    onOpenBrowser: (String) -> Unit,
     /** 可撤回的删除，非空时在输入栏上方显示提示 */
     undoable: UndoableRemoval? = null,
     onUndoRemoval: () -> Unit = {},
@@ -486,7 +490,8 @@ private fun ChatContent(
                                 appearance = appearance,
                                 providerLabel = providerLabel,
                                 onRetry = { onRetry(message.id) },
-                                onLongPress = { onLongPress(message) }
+                                onLongPress = { onLongPress(message) },
+                                onLinkClick = onOpenBrowser
                             )
                         }
                         // 零占位的滚动锚点。animateScrollToItem(index) 是把
