@@ -248,8 +248,8 @@ private fun List<InlineSpan>.toAnnotatedString(
                     withLink(
                         LinkAnnotation.Clickable(
                             tag = url,
-                            styles = LinkAnnotation.LinkStyles(
-                                SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
+                            styles = androidx.compose.foundation.text.TextLinkStyles(
+                                style = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
                             ),
                             linkInteractionListener = { onLinkClick(url) }
                         )
