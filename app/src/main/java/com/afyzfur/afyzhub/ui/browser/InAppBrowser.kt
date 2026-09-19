@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +63,7 @@ fun InAppBrowserScreen(
         WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            settings.setSupportZoomControls(true)
+            settings.setSupportZoom(true)
             settings.builtInZoomControls = true
             settings.displayZoomControls = false
             // 站内跳转（a 标签、重定向）留在本 WebView，不弹系统选择器
@@ -123,7 +122,7 @@ fun InAppBrowserScreen(
             ) {
                 IconButton(onClick = { onNavigateBack() }) {
                     Icon(
-                        Icons.AutoMirrored.Filled.Close,
+                        Icons.Default.Close,
                         contentDescription = "关闭浏览器"
                     )
                 }
@@ -150,9 +149,10 @@ fun InAppBrowserScreen(
                         }
                     }
                 ) {
-                    Icon(
-                        Icons.Default.OpenInNew,
-                        contentDescription = "在系统浏览器打开"
+                    Text(
+                        text = "↗",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
