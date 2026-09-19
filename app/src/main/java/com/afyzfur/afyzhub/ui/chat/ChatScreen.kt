@@ -137,23 +137,21 @@ fun ChatScreen(
     }
 
     LaunchedEffect(listState) {
-        // 同时订阅手势状态与位置：只看 isScrollInProgress 的话只在
-        // 手势起止各发射一次，拖到中途离开底部不会再次发射——那
-        // 恰恰是最需要停跟随的时刻，拖动中到达的增量会把用户拽回
-        // 底部。把 atBottom 也放进快照, 它一变(离开/回到底部区)立即
-        // 触发判定
+        // 手势/甩动一开始就停跟随, 不等离开容差区：程序滚动
+        // (scrollToItem) 在手势持有滚动锁时会挂起排队, 手指一松
+        // 就执行、把视口拽回底部。越早关掉跟随, 排队的滚动越少;
+        // 误停的代价为零——松手时结束沿结算会按位置恢复
         var wasScrolling = false
-        snapshotFlow { listState.isScrollInProgress to atBottom }
-            .collect { (scrolling, bottom) ->
-                if (scrolling && !bottom) {
-                    // 拖动中已离开底部: 立即停, 越早越好
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { scrolling ->
+                if (scrolling) {
                     autoScroll = false
-                } else if (wasScrolling && !scrolling) {
-                    // 只在手势结束沿(true→false)结算。若在所有非滚动
-                    // 帧都结算, 流式内容增长的瞬间 atBottom 会先变
-                    // false(布局先变、贴底滚动后到), 那一帧会把跟随
-                    // 误杀——正是上一版"跟随中途失效"的根源
-                    autoScroll = bottom
+                } else if (wasScrolling) {
+                    // 只在手势结束沿(true→false)结算, 停在底部区
+                    // (含容差)即恢复。若在所有非滚动帧都结算, 流式
+                    // 内容增长的瞬间 atBottom 会先变 false(布局先
+                    // 变、贴底滚动后到), 会把正常跟随误杀
+                    autoScroll = atBottom
                 }
                 wasScrolling = scrolling
             }
@@ -165,7 +163,10 @@ fun ChatScreen(
         if (messages.isEmpty()) return@LaunchedEffect
         // 用户刚发话: 强制回底, 自己的话必须进视野, 否则像发送失败
         if (messages.last().isFromUser) autoScroll = true
-        if (autoScroll) {
+        // 手势/甩动进行中不发起程序滚动：滚动互斥锁被手势持有,
+        // scrollToItem 会挂起排队, 手一松就补执行, 视口被拽回底部
+        // ——松手后的位置结算会按 atBottom 决定是否恢复, 不会漏
+        if (autoScroll && !listState.isScrollInProgress) {
             // 索引等于消息数: 列表末尾的 bottom-anchor, 详 LazyColumn 内注释
             listState.scrollToItem(messages.size)
         }
