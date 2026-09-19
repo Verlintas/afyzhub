@@ -7,7 +7,6 @@ import com.afyzfur.afyzhub.data.remote.dto.RequestMessage
 import com.afyzfur.afyzhub.data.remote.dto.StreamOptions
 import com.afyzfur.afyzhub.data.log.RequestLogContext
 import com.afyzfur.afyzhub.data.settings.AppSettings
-import com.afyzfur.afyzhub.domain.model.ThinkingEffort
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.Serializable
@@ -124,12 +123,8 @@ class OpenAiChatClient(
         stream = stream,
         // 仅流式请求索取 usage。非流式的 usage 本来就在响应体里
         stream_options = if (stream) StreamOptions() else null,
-        // 模型不支持思考时不发参数: UI 已按白名单置灰, 这里兜底
-        // 覆盖 UI 判定外的场景(如换到不支持模型后沿用旧设置)
-        reasoning_effort = if (settings.thinkingEffort.supportsModel(
-                settings.provider, settings.model)) {
-            settings.thinkingEffort.openAiEffort
-        } else null
+        // OFF 时为 null，序列化会省略该字段
+        reasoning_effort = settings.thinkingEffort.openAiEffort
     )
 
     private fun authHeaders(settings: AppSettings) = mapOf(

@@ -28,33 +28,6 @@ enum class ThinkingEffort(
     val enabled: Boolean get() = this != OFF
 
     /**
-     * 该档位是否对指定模型可用。
-     *
-     * 只关心"开启思考"的档位（低/中/高）：多数模型没有思考能力，
-     * 对它们发思考参数轻则被忽略、重则直接 400。OFF 对任何模型
-     * 都合法——不发参数或显式关闭，无兼容风险。
-     *
-     * 判定按提供商与模型名前缀做白名单，覆盖各家已知的思考模型：
-     * - OpenAI 系: o 系列(o1/o3/o4)与 gpt-5 系
-     * - Anthropic: claude-3-7 及之后
-     * - Gemini: 2.5 系(flash/pro)
-     * 白名单之外按不支持处理——不发思考参数最多"没生效"，发了被
-     * 拒绝则整条消息失败，宁可保守。新模型上市后在此追加即可。
-     */
-    fun supportsModel(provider: AiProvider, model: String): Boolean {
-        if (this == OFF) return true
-        val m = model.trim().lowercase()
-        return when (provider) {
-            AiProvider.OPENAI -> m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4") ||
-                m.startsWith("gpt-5") || m.contains("-o1") || m.contains("-o3") || m.contains("-o4")
-            AiProvider.ANTHROPIC -> m.startsWith("claude-3-7") || m.startsWith("claude-4") ||
-                m.startsWith("claude-sonnet-4") || m.startsWith("claude-opus-4") ||
-                m.startsWith("claude-haiku-4")
-            AiProvider.GEMINI -> m.contains("gemini-2.5")
-        }
-    }
-
-    /**
      * Anthropic 在开启思考时所需的 max_tokens 下限。
      *
      * Claude 要求 `max_tokens` 严格大于 `thinking.budget_tokens`，

@@ -126,22 +126,18 @@ class GeminiChatClient(
         // 整个 config 不发等于沿用默认，"关闭"永远不生效。0 是官方
         // 文档的关闭值；-1 是动态预算，不是关闭
         val effort = settings.thinkingEffort
-        // 模型不支持思考时按 OFF 处理: UI 已按白名单置灰, 这里兜底
-        val effortForModel = if (effort.supportsModel(settings.provider, settings.model)) {
-            effort
-        } else ThinkingEffort.OFF
         val config = when {
-            effortForModel == ThinkingEffort.OFF ->
+            effort == ThinkingEffort.OFF ->
                 GenerationConfig(
                     thinkingConfig = ThinkingConfig(
                         thinkingBudget = 0,
                         includeThoughts = false
                     )
                 )
-            effortForModel.tokenBudget != null ->
+            effort.tokenBudget != null ->
                 GenerationConfig(
                     thinkingConfig = ThinkingConfig(
-                        thinkingBudget = effortForModel.tokenBudget,
+                        thinkingBudget = effort.tokenBudget,
                         includeThoughts = true
                     )
                 )

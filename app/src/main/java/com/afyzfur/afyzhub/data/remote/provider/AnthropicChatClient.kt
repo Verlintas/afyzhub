@@ -2,7 +2,6 @@ package com.afyzfur.afyzhub.data.remote.provider
 
 import com.afyzfur.afyzhub.data.log.RequestLogContext
 import com.afyzfur.afyzhub.data.settings.AppSettings
-import com.afyzfur.afyzhub.domain.model.ThinkingEffort
 import com.afyzfur.afyzhub.util.Constants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -171,11 +170,7 @@ class AnthropicChatClient(
         // 档位翻译成 token 预算。OFF 时整个字段不出现——不支持思考的
         // 模型收到这个字段会报错
         val effort = settings.thinkingEffort
-        // 模型不支持思考时按 OFF 处理: UI 已按白名单置灰, 这里兜底
-        val effective = if (effort.supportsModel(settings.provider, settings.model)) {
-            effort
-        } else ThinkingEffort.OFF
-        val thinking = effective.tokenBudget?.let {
+        val thinking = effort.tokenBudget?.let {
             ThinkingConfig(type = "enabled", budgetTokens = it)
         }
 
@@ -183,7 +178,7 @@ class AnthropicChatClient(
             model = settings.model,
             messages = messages,
             system = systemPrompt,
-            maxTokens = effective.anthropicMaxTokens(Constants.DEFAULT_MAX_TOKENS),
+            maxTokens = effort.anthropicMaxTokens(Constants.DEFAULT_MAX_TOKENS),
             stream = stream,
             thinking = thinking
         )
