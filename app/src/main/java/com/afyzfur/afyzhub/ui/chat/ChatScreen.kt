@@ -15,8 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import com.afyzfur.afyzhub.ui.components.ModelIcon
@@ -112,39 +112,50 @@ fun ChatScreen(
     /**
      * 滚动跟随策略。
      *
-     * 旧实现每次内容变化都无条件 animateScrollToItem 到底部：AI 思考与
-     * 流式输出时用户想往上翻看历史消息，会被不断拽回底部，等于没法读。
-     *
-     * 现在只有"仍然贴着底部"时才跟随。用户上滑离开底部即停止，滚回
-     * 底部附近自动恢复。判断用的是 canScrollForward——比比较 offset
-     * 简单直接：还剩可滚动余量就是不在底部。
+     * 贴底即时滚动（scrollToItem，无动画）+ 手势结算：
+     * - 跟随中内容每变一次立即贴底。不用 animateScrollToItem：动画会把
+     *   isScrollInProgress 置真，与用户手势无法区分；流式增量一个接一个，
+     *   动画反复被打断重启，跟随状态在竞争里悄悄失效。即时滚动没有动画，
+     *   isScrollInProgress 只剩用户手势一个来源
+     * - 手势进行中一旦离开底部区域立即停跟随——上滑要抢在 fling 结束前
+     *   生效，否则快速上滑会被中途到达的增量拽回底部
+     * - 手势结束（settle）时按最终位置结算：停在底部就恢复跟随
      */
-    // 键绑定会话 id: 上个会话里停掉的跟随不该带进新会话
     var autoScroll by remember(currentConversationId) { mutableStateOf(true) }
 
-    /**
-     * 用户滚回底部时恢复跟随。只监听 canScrollForward 从 true 变
-     * false 的时刻——程序吸底动画的中间态不会触发恢复, 只有用户
-     * 亲手把列表拖到底(或程序动画恰好落底, 下一帧自动同步)才生效。
-     */
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.canScrollForward }
-            .distinctUntilChanged()
-            .collect { canForward ->
-                if (!canForward) autoScroll = true
-            }
+    // 视口是否停在（或接近）列表底部。128px 容差："差一点到底"也认作
+    // 到底，否则恢复条件苛刻到手松开后仍差 1px 而不生效
+    val atBottom by remember(listState) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+                ?: return@derivedStateOf true
+            // 最后一项(bottom-anchor)可见且其底边离视口底不远
+            last.index >= info.totalItemsCount - 1 &&
+                last.offset + last.size <= info.viewportEndOffset + 128
+        }
     }
-    // 用户开始手动滚动且当前不在底部: 立即停跟随。isScrollInProgress
-    // 在程序动画时也为 true, 但程序动画目标就是底部, 动画期间用户
-    // 若没插手, canScrollForward 很快变 false, 上面那个 flow 会把
-    // autoScroll 重新拉回 true——两者共同作用, 中间这一瞬的 false
-    // 不会造成可见影响
+
     LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .collect { scrolling ->
-                if (scrolling && listState.canScrollForward) {
+        // 同时订阅手势状态与位置：只看 isScrollInProgress 的话只在
+        // 手势起止各发射一次，拖到中途离开底部不会再次发射——那
+        // 恰恰是最需要停跟随的时刻，拖动中到达的增量会把用户拽回
+        // 底部。把 atBottom 也放进快照, 它一变(离开/回到底部区)立即
+        // 触发判定
+        var wasScrolling = false
+        snapshotFlow { listState.isScrollInProgress to atBottom }
+            .collect { (scrolling, bottom) ->
+                if (scrolling && !bottom) {
+                    // 拖动中已离开底部: 立即停, 越早越好
                     autoScroll = false
+                } else if (wasScrolling && !scrolling) {
+                    // 只在手势结束沿(true→false)结算。若在所有非滚动
+                    // 帧都结算, 流式内容增长的瞬间 atBottom 会先变
+                    // false(布局先变、贴底滚动后到), 那一帧会把跟随
+                    // 误杀——正是上一版"跟随中途失效"的根源
+                    autoScroll = bottom
                 }
+                wasScrolling = scrolling
             }
     }
 
@@ -152,16 +163,11 @@ fun ChatScreen(
     val lastContentLength = messages.lastOrNull()?.content?.length ?: 0
     LaunchedEffect(messages.size, lastContentLength) {
         if (messages.isEmpty()) return@LaunchedEffect
-        // 用户刚发出消息(最后一条来自用户): 无论之前是否停了跟随,
-        // 都强制回底——自己发的话必须出现在视野里, 否则容易误以为
-        // 发送失败。AI 回复期间的滚动仍交给 autoScroll 决定
-        val lastFromUser = messages.last().isFromUser
-        if (lastFromUser) {
-            autoScroll = true
-            listState.animateScrollToItem(messages.size)
-        } else if (autoScroll) {
-            // 索引等于消息数: 列表末尾的 bottom-anchor, 详前注释
-            listState.animateScrollToItem(messages.size)
+        // 用户刚发话: 强制回底, 自己的话必须进视野, 否则像发送失败
+        if (messages.last().isFromUser) autoScroll = true
+        if (autoScroll) {
+            // 索引等于消息数: 列表末尾的 bottom-anchor, 详 LazyColumn 内注释
+            listState.scrollToItem(messages.size)
         }
     }
 
