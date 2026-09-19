@@ -14,20 +14,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,14 +96,44 @@ private fun MarkdownBlockView(
     onLinkClick: ((String) -> Unit)? = null
 ) {
     when (block) {
-        is MarkdownBlock.Paragraph -> Text(
-            text = block.spans.toAnnotatedString(onLinkClick ?: {}),
-            color = color,
-            style = MaterialTheme.typography.bodyLarge
-        )
+        is MarkdownBlock.Paragraph -> if (onLinkClick != null) {
+            LinkAwareText(
+                text = block.spans.toAnnotatedString(),
+                color = color,
+                style = MaterialTheme.typography.bodyLarge,
+                onLinkClick = onLinkClick
+            )
+        } else {
+            Text(
+                text = block.spans.toAnnotatedString(),
+                color = color,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
 
-        is MarkdownBlock.Heading -> Text(
-            text = block.spans.toAnnotatedString(onLinkClick ?: {}),
+        is MarkdownBlock.Heading -> if (onLinkClick != null) {
+            LinkAwareText(
+                text = block.spans.toAnnotatedString(),
+                color = color,
+                style = if (documentMode) {
+                    when (block.level) {
+                        1 -> MaterialTheme.typography.displaySmall
+                        2 -> MaterialTheme.typography.headlineLarge
+                        3 -> MaterialTheme.typography.titleLarge
+                        else -> MaterialTheme.typography.titleMedium
+                    }
+                } else {
+                    when (block.level) {
+                        1 -> MaterialTheme.typography.headlineMedium
+                        2 -> MaterialTheme.typography.headlineSmall
+                        3 -> MaterialTheme.typography.titleLarge
+                        else -> MaterialTheme.typography.titleMedium
+                    }
+                },
+                onLinkClick = onLinkClick
+            )
+        } else Text(
+            text = block.spans.toAnnotatedString(),
             color = color,
             // 各级差距拉开：原先 titleMedium 与 titleSmall 只差 2sp，
             // 二级与三级标题几乎看不出层级，更新日志里的版本号
@@ -138,11 +169,20 @@ private fun MarkdownBlockView(
                 color = color,
                 style = MaterialTheme.typography.bodyLarge
             )
-            Text(
-                text = block.spans.toAnnotatedString(onLinkClick ?: {}),
-                color = color,
-                style = MaterialTheme.typography.bodyLarge
-            )
+            if (onLinkClick != null) {
+                LinkAwareText(
+                    text = block.spans.toAnnotatedString(),
+                    color = color,
+                    style = MaterialTheme.typography.bodyLarge,
+                    onLinkClick = onLinkClick
+                )
+            } else {
+                Text(
+                    text = block.spans.toAnnotatedString(),
+                    color = color,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
         }
 
         is MarkdownBlock.Quote -> Row {
@@ -154,12 +194,21 @@ private fun MarkdownBlockView(
                     .heightIn(min = 20.dp)
             ) {}
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = block.spans.toAnnotatedString(onLinkClick ?: {}),
-                color = color.copy(alpha = 0.85f),
-                style = MaterialTheme.typography.bodyMedium,
-                fontStyle = FontStyle.Italic
-            )
+            if (onLinkClick != null) {
+                LinkAwareText(
+                    text = block.spans.toAnnotatedString(),
+                    color = color.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    onLinkClick = onLinkClick
+                )
+            } else {
+                Text(
+                    text = block.spans.toAnnotatedString(),
+                    color = color.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = FontStyle.Italic
+                )
+            }
         }
 
         // 上下留白：分隔线的作用是划分区块，紧贴文字反而像下划线。
@@ -216,16 +265,48 @@ private fun CodeBlockView(block: MarkdownBlock.CodeBlock) {
     }
 }
 
+
+/**
+ * 支持链接点击的 Text。
+ *
+ * 手势用 detectTapGestures 且只声明 onTap：未声明的长按不消费，
+ * 外层（如消息长按菜单的 combinedClickable）仍能收到。
+ */
+@Composable
+private fun LinkAwareText(
+    text: AnnotatedString,
+    color: Color,
+    style: androidx.compose.ui.text.TextStyle,
+    onLinkClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var layout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    Text(
+        text = text,
+        color = color,
+        style = style,
+        onTextLayout = { layout = it },
+        modifier = modifier.pointerInput(text, onLinkClick) {
+            detectTapGestures { offset ->
+                val result = layout ?: return@detectTapGestures
+                val position = result.getOffsetForPosition(offset)
+                val hit = text.getStringAnnotations(position, position)
+                    .firstOrNull { it.tag == URL_TAG }
+                hit?.let { onLinkClick(it.item) }
+            }
+        }
+    )
+}
+
 /**
  * 把解析出的行内片段转成 Compose 可渲染的富文本。
  *
- * 链接带 LinkAnnotation：点击后由调用方导航到应用内浏览器，
- * 而非丢给系统浏览器。样式部分与旧实现一致。
+ * 链接用 pushStringAnnotation 标记 URL 区间，点击位置由
+ * [LinkAwareText] 的手势检测反查注释得到。不用 LinkAnnotation：
+ * 该 API 在不同 Compose 小版本间签名变动过，标注法自 1.0 起稳定。
  */
 @Composable
-private fun List<InlineSpan>.toAnnotatedString(
-    onLinkClick: (String) -> Unit
-): AnnotatedString {
+private fun List<InlineSpan>.toAnnotatedString(): AnnotatedString {
     val linkColor = MaterialTheme.colorScheme.primary
     val codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest
 
@@ -243,22 +324,19 @@ private fun List<InlineSpan>.toAnnotatedString(
                     else -> null
                 }
             )
-            withStyle(style) {
-                span.url?.let { url ->
-                    withLink(
-                        LinkAnnotation.Clickable(
-                            tag = url,
-                            styles = androidx.compose.foundation.text.TextLinkStyles(
-                                style = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
-                            ),
-                            linkInteractionListener = { onLinkClick(url) }
-                        )
-                    ) { append(span.text) }
-                } ?: append(span.text)
+            if (span.url != null) {
+                pushStringAnnotation(tag = URL_TAG, annotation = span.url)
+                withStyle(style) { append(span.text) }
+                pop()
+            } else {
+                withStyle(style) { append(span.text) }
             }
         }
     }
 }
+
+/** 链接区间注释的 tag */
+private const val URL_TAG = "URL"
 
 private fun copyToClipboard(context: Context, text: String) {
     val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
