@@ -100,7 +100,7 @@ class WebSearchService(
         .replace("&quot;", "\"")
         .replace("&#x27;", "'")
         .replace("&nbsp;", " ")
-        .replace(Regex("\s+"), " ")
+        .replace(Regex("\\s+"), " ")
         .trim()
 
     /**
