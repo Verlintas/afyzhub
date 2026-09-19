@@ -97,7 +97,7 @@ class WebSearchService(
         .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
-        .replace(""", "\"")
+        .replace("&quot;", "\"")
         .replace("&#x27;", "'")
         .replace("&nbsp;", " ")
         .replace(Regex("\s+"), " ")
