@@ -9,9 +9,11 @@ import com.afyzfur.afyzhub.data.remote.provider.ChatClientRegistry
 import com.afyzfur.afyzhub.data.remote.provider.ChatTurn
 import com.afyzfur.afyzhub.data.remote.provider.CompletionResult
 import com.afyzfur.afyzhub.data.remote.provider.StreamEvent
+import com.afyzfur.afyzhub.data.remote.provider.WebSearchService
 import com.afyzfur.afyzhub.data.remote.provider.TokenUsage
 import com.afyzfur.afyzhub.data.settings.AppSettings
 import com.afyzfur.afyzhub.data.settings.SettingsProvider
+import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.Conversation
 import com.afyzfur.afyzhub.domain.model.ConversationItem
 import com.afyzfur.afyzhub.domain.model.Message
@@ -27,7 +29,8 @@ class ChatRepositoryImpl(
     private val conversationDao: ConversationDao,
     private val messageDao: MessageDao,
     private val clientRegistry: ChatClientRegistry,
-    private val settingsProvider: SettingsProvider
+    private val settingsProvider: SettingsProvider,
+    private val webSearchService: WebSearchService
 ) : ChatRepository {
 
     override fun getAllConversations(): Flow<List<Conversation>> =
@@ -143,11 +146,43 @@ class ChatRepositoryImpl(
                 client.complete(turns, settings)
             }
 
-            val latencyMs = System.currentTimeMillis() - startedAt
-            val reply = outcome.content
+            var reply = outcome.content
             if (reply.isBlank()) {
                 throw IllegalStateException("模型返回内容为空")
             }
+
+            // 应用层联网搜索：模型请求了搜索则执行, 把结果作为
+            // 补充上下文再次请求, 用新回复替换。Gemini 走原生
+            // grounding, 不会输出搜索标签, 此块自然跳过
+            var searchUsage = outcome.usage
+            val searchQuery = WebSearchService.extractQuery(reply)
+            if (searchQuery != null &&
+                settings.webSearchEnabled &&
+                settings.provider != AiProvider.GEMINI
+            ) {
+                onPhase(SendPhase.SEARCHING)
+                val results = webSearchService.search(searchQuery)
+                val searchedTurns = turns + listOf(
+                    ChatTurn(role = "assistant", content = reply),
+                    ChatTurn(
+                        role = "user",
+                        content = "以下是「" + searchQuery + "」的搜索结果：\n\n" +
+                            WebSearchService.formatResults(results) +
+                            "\n\n请基于以上结果继续回答。"
+                    )
+                )
+                val secondOutcome = if (settings.streamEnabled) {
+                    collectStream(client, searchedTurns, settings, assistantId!!, onPhase)
+                } else {
+                    client.complete(searchedTurns, settings)
+                }
+                searchUsage = secondOutcome.usage ?: searchUsage
+                reply = secondOutcome.content
+                if (reply.isBlank()) {
+                    throw IllegalStateException("模型返回内容为空")
+                }
+            }
+            val latencyMs = System.currentTimeMillis() - startedAt
             messageDao.updateStatus(userMessageId, Constants.STATUS_SUCCESS, null)
 
             val finalId = assistantId?.also {
@@ -156,8 +191,8 @@ class ChatRepositoryImpl(
                     content = reply,
                     status = Constants.STATUS_SUCCESS,
                     model = settings.model,
-                    promptTokens = outcome.usage?.promptTokens,
-                    completionTokens = outcome.usage?.completionTokens,
+                    promptTokens = searchUsage?.promptTokens,
+                    completionTokens = searchUsage?.completionTokens,
                     latencyMs = latencyMs
                 )
             } ?: messageDao.insertMessage(
@@ -167,8 +202,8 @@ class ChatRepositoryImpl(
                     role = Constants.ROLE_ASSISTANT,
                     status = Constants.STATUS_SUCCESS,
                     model = settings.model,
-                    promptTokens = outcome.usage?.promptTokens,
-                    completionTokens = outcome.usage?.completionTokens,
+                    promptTokens = searchUsage?.promptTokens,
+                    completionTokens = searchUsage?.completionTokens,
                     latencyMs = latencyMs
                 )
             )
@@ -181,8 +216,8 @@ class ChatRepositoryImpl(
                     role = Constants.ROLE_ASSISTANT,
                     createdAt = System.currentTimeMillis(),
                     model = settings.model,
-                    promptTokens = outcome.usage?.promptTokens,
-                    completionTokens = outcome.usage?.completionTokens,
+                    promptTokens = searchUsage?.promptTokens,
+                    completionTokens = searchUsage?.completionTokens,
                     latencyMs = latencyMs
                 )
             )
@@ -374,11 +409,25 @@ class ChatRepositoryImpl(
 
         // 系统提示词注入在对话最前：约束是"这个助手是什么样"，
         // 属于所有轮次的前置条件，放在历史消息之后会失去效力
-        val systemPrompt = settingsProvider.current().systemPrompt.trim()
-        return if (systemPrompt.isEmpty()) {
-            turns
-        } else {
-            listOf(ChatTurn(role = "system", content = systemPrompt)) + turns
+        val settings = settingsProvider.current()
+        val systemPrompt = settings.systemPrompt.trim()
+        // 联网搜索指令：仅当开关开启且提供商无原生搜索时注入。
+        // Gemini 的服务端 grounding 质量更高，保持原生路径
+        val searchInstruction = if (
+            settings.webSearchEnabled &&
+            settings.provider != AiProvider.GEMINI
+        ) {
+            WebSearchService.instruction()
+        } else null
+
+        return buildList {
+            if (systemPrompt.isNotEmpty()) {
+                add(ChatTurn(role = "system", content = systemPrompt))
+            }
+            if (searchInstruction != null) {
+                add(ChatTurn(role = "system", content = searchInstruction))
+            }
+            addAll(turns)
         }
     }
 

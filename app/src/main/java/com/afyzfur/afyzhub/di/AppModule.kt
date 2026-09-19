@@ -18,8 +18,10 @@ import org.koin.dsl.module
 
 val appModule = module {
 
-    // Repository：conversationDao, messageDao, clientRegistry, settingsProvider
-    single<ChatRepository> { ChatRepositoryImpl(get(), get(), get(), get()) }
+    // Repository：conversationDao, messageDao, clientRegistry, settingsProvider, webSearchService
+    single<ChatRepository> { ChatRepositoryImpl(get(), get(), get(), get(), get()) }
+    // 应用层网络搜索: 复用 Transport, 无新增依赖
+    single { com.afyzfur.afyzhub.data.remote.provider.WebSearchService(get()) }
 
     // UseCases
     single { SendMessageUseCase(get()) }

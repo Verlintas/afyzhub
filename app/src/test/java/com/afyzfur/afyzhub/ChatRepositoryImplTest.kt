@@ -86,6 +86,35 @@ class ChatRepositoryImplTest {
     private suspend fun newConversation(): Long =
         conversationDao.insertConversation(ConversationEntity(title = "新对话"))
 
+    /** 搜索服务的假传输：单测不联网，返回空页让搜索结果为空 */
+    private object NoopTransport : com.afyzfur.afyzhub.data.remote.provider.Transport {
+        override suspend fun getForText(
+            baseUrl: String,
+            path: String,
+            headers: Map<String, String>,
+            query: Map<String, String>,
+            logContext: com.afyzfur.afyzhub.data.log.RequestLogContext
+        ): String = ""
+
+        override suspend fun postForText(
+            baseUrl: String,
+            path: String,
+            headers: Map<String, String>,
+            body: String,
+            query: Map<String, String>,
+            logContext: com.afyzfur.afyzhub.data.log.RequestLogContext
+        ): String = ""
+
+        override fun postForSse(
+            baseUrl: String,
+            path: String,
+            headers: Map<String, String>,
+            body: String,
+            query: Map<String, String>,
+            logContext: com.afyzfur.afyzhub.data.log.RequestLogContext
+        ): kotlinx.coroutines.flow.Flow<String> = kotlinx.coroutines.flow.flowOf()
+    }
+
     /** 默认关闭流式，让既有断言仍走一次性返回路径。 */
     private fun repository(
         client: ChatClient,
@@ -98,7 +127,8 @@ class ChatRepositoryImplTest {
         conversationDao,
         messageDao,
         ChatClientRegistry(mapOf(settings.provider to client)),
-        FixedSettings(settings)
+        FixedSettings(settings),
+        com.afyzfur.afyzhub.data.remote.provider.WebSearchService(NoopTransport)
     )
 
     @Test
@@ -151,7 +181,8 @@ class ChatRepositoryImplTest {
                     AiProvider.ANTHROPIC to claude
                 )
             ),
-            FixedSettings(settings)
+            FixedSettings(settings),
+            com.afyzfur.afyzhub.data.remote.provider.WebSearchService(NoopTransport)
         )
 
         val result = repo.sendMessage(newConversation(), "你好")
@@ -173,7 +204,8 @@ class ChatRepositoryImplTest {
             messageDao,
             // 故意只注册 OpenAI，模拟缺失实现。
             ChatClientRegistry(mapOf(AiProvider.OPENAI to RecordingClient())),
-            FixedSettings(settings)
+            FixedSettings(settings),
+            com.afyzfur.afyzhub.data.remote.provider.WebSearchService(NoopTransport)
         )
 
         val result = repo.sendMessage(newConversation(), "你好")
