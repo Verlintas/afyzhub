@@ -48,7 +48,23 @@ class WebSearchService(
                     model = "duckduckgo"
                 )
             )
-            parseResults(html, maxResults)
+            val first = parseResults(html, maxResults)
+            // DuckDuckGo 被反爬或网络受限时结果为空, 换 Bing 再试。
+            // 两家都失败才返回空, 让模型走无结果兜底路径
+            if (first.isNotEmpty()) return first
+            val bingHtml = transport.getForText(
+                baseUrl = "https://www.bing.com",
+                path = "/search",
+                headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36"
+                ),
+                query = mapOf("q" to query),
+                logContext = RequestLogContext(
+                    provider = "web-search",
+                    model = "bing"
+                )
+            )
+            return parseBing(bingHtml, maxResults)
         } catch (_: Exception) {
             emptyList()
         }
@@ -91,6 +107,29 @@ class WebSearchService(
         }.take(maxResults)
     }
 
+    /**
+     * 解析 Bing 移动版结果页。
+     *
+     * 每条结果在 li.b_algo 块内: 标题与链接在第一个 a 标签,
+     * 摘要在第一个 p 标签。按块切分加通用标签匹配,
+     * 对页面局部结构调整不敏感。
+     */
+    private fun parseBing(html: String, maxResults: Int): List<Result> {
+        val blocks = html.split("<li class=\"b_algo\"").drop(1)
+        val out = mutableListOf<Result>()
+        for (b in blocks) {
+            val url = Regex("href=\"([^\"]+)\"").find(b)?.groupValues?.get(1)
+                ?: continue
+            val title = Regex("<a[^>]*>(.*?)</a>", RegexOption.DOT_MATCHES_ALL)
+                .find(b)?.groupValues?.get(1) ?: continue
+            val snippet = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL)
+                .find(b)?.groupValues?.get(1) ?: ""
+            out += Result(stripTags(title), stripTags(snippet), url)
+            if (out.size >= maxResults) break
+        }
+        return out
+    }
+
     /** 去除 HTML 标签与实体，压缩空白 */
     private fun stripTags(raw: String): String = raw
         .replace(Regex("<[^>]+>"), "")
@@ -131,9 +170,11 @@ class WebSearchService(
 
         /** 从模型输出中提取搜索查询词 */
         fun extractQuery(reply: String): String? {
-            val m = Regex("<search>(.*?)</search>", RegexOption.DOT_MATCHES_ALL)
-                .find(reply) ?: return null
-            return m.groupValues[1].trim().takeIf { it.isNotBlank() }
+            val m = Regex("""<search>(.*?)</search>""", RegexOption.DOT_MATCHES_ALL)
+                .find(reply)
+                ?: Regex("""<search>(.*)""", RegexOption.DOT_MATCHES_ALL)
+                    .find(reply)
+            return m?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
         }
 
         /** 把搜索结果格式化为注入上下文的文本 */

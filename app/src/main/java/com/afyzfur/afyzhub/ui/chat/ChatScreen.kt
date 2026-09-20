@@ -126,15 +126,11 @@ fun ChatScreen(
 
     // 视口是否停在（或接近）列表底部。128px 容差："差一点到底"也认作
     // 到底，否则恢复条件苛刻到手松开后仍差 1px 而不生效
+    // canScrollForward=false 即"下方再无内容", 是真正的底部判定。
+    // 旧的"最后一项底边位置"判定在单条消息超一屏时失效: 视口停在
+    // 该消息内部时, 各项坐标条件全部误真, 松手即被拽回底部
     val atBottom by remember(listState) {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()
-                ?: return@derivedStateOf true
-            // 最后一项(bottom-anchor)可见且其底边离视口底不远
-            last.index >= info.totalItemsCount - 1 &&
-                last.offset + last.size <= info.viewportEndOffset + 128
-        }
+        derivedStateOf { !listState.canScrollForward }
     }
 
     LaunchedEffect(listState) {

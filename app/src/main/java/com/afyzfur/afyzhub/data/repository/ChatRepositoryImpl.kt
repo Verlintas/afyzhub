@@ -172,7 +172,7 @@ class ChatRepositoryImpl(
                     )
                 )
                 val secondOutcome = if (settings.streamEnabled) {
-                    collectStream(client, searchedTurns, settings, assistantId!!, onPhase)
+                    collectStream(client, searchedTurns, settings, assistantId!!, onPhase, reply)
                 } else {
                     client.complete(searchedTurns, settings)
                 }
@@ -357,11 +357,15 @@ class ChatRepositoryImpl(
         turns: List<ChatTurn>,
         settings: AppSettings,
         placeholderId: Long,
-        onPhase: (SendPhase) -> Unit
+        onPhase: (SendPhase) -> Unit,
+        initialContent: String = ""
     ): CompletionResult {
-        val builder = StringBuilder()
+        // 搜索后的二次请求以第一轮内容为底追加: 思考与搜索
+        // 标签都是这条回复的一部分, 覆盖式重置会全部丢失
+        val builder = StringBuilder(initialContent)
         var usage: TokenUsage? = null
         var lastUpdateTime = 0L
+        var receivedThisRound = false
         val updateInterval = 50L // 50ms 更新一次，平衡流畅度和性能
 
         client.stream(turns, settings).collect { event ->
@@ -369,7 +373,10 @@ class ChatRepositoryImpl(
                 is StreamEvent.TextDelta -> {
                     // 首个片段到达即离开等待阶段。此后内容在陆续显现，
                     // 用户能直接看到进展，状态文字的作用就减弱了
-                    if (builder.isEmpty()) onPhase(SendPhase.RECEIVING)
+                    if (!receivedThisRound) {
+                        receivedThisRound = true
+                        onPhase(SendPhase.RECEIVING)
+                    }
                     builder.append(event.delta)
                     
                     // 批量更新：累积到一定时间再写数据库，避免过于频繁的更新

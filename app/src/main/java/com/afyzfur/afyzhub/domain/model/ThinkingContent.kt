@@ -84,3 +84,23 @@ private val OPEN_THINK = Regex(
     "<(?:$TAG_NAMES)>(.*)",
     setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
 )
+
+/**
+ * 联网搜索协议的标签解析。
+ *
+ * 模型按指令输出搜索标签, 发送流程截获后执行搜索;
+ * UI 用它提取搜索词展示搜索块, 并从正文剥除标签。
+ */
+private val SEARCH_TAG = Regex(
+    """<search>(.*?)</search>""",
+    RegexOption.DOT_MATCHES_ALL
+)
+
+/** 提取搜索词, 无标签或内容为空时返回 null */
+fun parseSearchQuery(content: String): String? =
+    SEARCH_TAG.find(content)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
+
+/** 剥除正文中的搜索标签, 未闭合的开标签一并清掉 */
+fun stripSearchTag(content: String): String = SEARCH_TAG.replace(content, "")
+    .replace(Regex("""<search>.*""", RegexOption.DOT_MATCHES_ALL), "")
+    .trim()

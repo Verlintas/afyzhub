@@ -33,6 +33,8 @@ import com.afyzfur.afyzhub.data.settings.ChatAppearance
 import com.afyzfur.afyzhub.data.settings.MessageDisplayOptions
 import com.afyzfur.afyzhub.domain.model.Message
 import com.afyzfur.afyzhub.domain.model.parseThinking
+import com.afyzfur.afyzhub.domain.model.parseSearchQuery
+import com.afyzfur.afyzhub.domain.model.stripSearchTag
 import com.afyzfur.afyzhub.ui.components.LocalImage
 import com.afyzfur.afyzhub.ui.components.ModelIcon
 import com.afyzfur.afyzhub.ui.components.UserAvatar
@@ -159,6 +161,10 @@ private fun MessageBody(
     val parsed = remember(message.content, fromUser) {
         if (fromUser) null else parseThinking(message.content)
     }
+    // 搜索协议标签: 展示为独立搜索块, 正文里剥掉
+    val searchQuery = remember(message.content, fromUser) {
+        if (fromUser) null else parseSearchQuery(message.content)
+    }
 
     val content: @Composable () -> Unit = {
         if (fromUser) {
@@ -174,7 +180,7 @@ private fun MessageBody(
         } else {
             MarkdownText(
                 // 用剥掉标签后的正文，否则 <think> 会原样显示
-                text = parsed?.answer ?: message.content,
+                text = stripSearchTag(parsed?.answer ?: message.content),
                 color = if (style == BubbleStyle.BUBBLE) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
@@ -206,12 +212,17 @@ private fun MessageBody(
         )
     }
 
+    // 搜索块: 与思考块同级的独立栏, 展示这次回复实际用了什么查询
+    if (searchQuery != null) {
+        SearchBlock(query = searchQuery)
+    }
+
     // 思考进行中而正文尚未开始时不渲染气泡，否则会出现一个空容器。
     // 这正是截图里那条空白圆角块的来源
     //
     // 等待首 token 时（无思考、正文仍为空）同样不渲染：等 AI 开口
     // 之前界面上不该有任何占位框，进度由输入栏的阶段文字说明
-    val answerText = parsed?.answer ?: message.content
+    val answerText = stripSearchTag(parsed?.answer ?: message.content)
     if (message.isSending && answerText.isBlank() && !fromUser) {
         return
     }
@@ -353,6 +364,45 @@ private fun FailedMessage(
         )
         TextButton(onClick = onRetry) {
             Text("重试")
+        }
+    }
+}
+
+/**
+ * 联网搜索块: 展示这条回复触发的搜索查询。
+ *
+ * 与思考块同样的独立成栏处理——它是回复的附属信息,
+ * 不是正文的一部分。样式刻意做得低调: 一行图标加文字,
+ * 不与气泡争夺注意力
+ */
+@Composable
+private fun SearchBlock(
+    query: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                text = "已联网搜索：$query",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
