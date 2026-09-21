@@ -69,7 +69,9 @@ fun NavGraph() {
         org.koin.java.KoinJavaComponent.get(
             com.afyzfur.afyzhub.data.settings.SettingsRepository::class.java
         )
-    val browserEnabled by settingsRepo.settings.collectAsState(initial = true)
+    val browserSettings by settingsRepo.settings.collectAsState()
+    // StateFlow 总有值, 但为类型安全仍判空兜底
+    val browserEnabled: Boolean = browserSettings?.inAppBrowserEnabled ?: true
 
     NavHost(
         navController = navController,

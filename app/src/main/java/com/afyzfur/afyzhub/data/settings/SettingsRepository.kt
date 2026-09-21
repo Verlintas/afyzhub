@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.afyzfur.afyzhub.data.remote.provider.SearchEngine
 import com.afyzfur.afyzhub.data.log.LogRetention
 import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.ApiProfileStore
