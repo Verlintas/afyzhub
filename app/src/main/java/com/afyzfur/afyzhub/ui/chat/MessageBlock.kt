@@ -176,6 +176,13 @@ private fun MessageBody(
     val contentBlocks = remember(message.content, fromUser) {
         if (fromUser) emptyList() else parseContentBlocks(message.content)
     }
+    val answerText = remember(message.content, fromUser) {
+        if (fromUser) message.content
+        else parseContentBlocks(message.content)
+            .filterIsInstance<ContentBlock.Answer>()
+            .joinToString("\n\n") { it.text }
+            .trim()
+    }
     // 搜索来源列表: 默认收起, 展开显示本次实际用到的页面
     val searchSources = remember(message.content, fromUser) {
         if (fromUser) emptyList() else parseSearchSources(message.content)
@@ -241,13 +248,6 @@ private fun MessageBody(
     //
     // 等待首 token 时（无思考、正文仍为空）同样不渲染：等 AI 开口
     // 之前界面上不该有任何占位框，进度由输入栏的阶段文字说明
-    val answerText = remember(message.content, fromUser) {
-        if (fromUser) message.content
-        else parseContentBlocks(message.content)
-            .filterIsInstance<ContentBlock.Answer>()
-            .joinToString("\n\n") { it.text }
-            .trim()
-    }
     if (message.isSending && answerText.isBlank() && !fromUser) {
         return
     }
