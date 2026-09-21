@@ -23,6 +23,14 @@ data class ApiProfile(
     val apiKey: String = "",
     val baseUrl: String = "",
     val model: String = "",
+    /**
+     * 该组的系统提示词。
+     *
+     * 按配置组而非全局：不同的 Key 可能对应不同的产品形态
+     * （工作助手 / 日常闲聊），提示词跟着组走，切换组即切换人设。
+     * 空串表示该组不注入。
+     */
+    val systemPrompt: String = "",
     /** 该组上次拉取到的模型列表，避免每次重进都要重新获取 */
     val cachedModels: List<String> = emptyList(),
     /** 用户筛选的模型，空表示未筛选（显示全部）*/

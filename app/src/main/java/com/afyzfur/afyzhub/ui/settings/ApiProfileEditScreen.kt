@@ -160,6 +160,21 @@ fun ApiProfileEditScreen(
                     }
                 }
 
+                SettingsCategoryTitle("系统提示词")
+                SettingsGroup {
+                    SettingsTextFieldItem(
+                        identityKey = profileId,
+                        title = "该组的系统提示词",
+                        value = profile.systemPrompt,
+                        onValueChange = {
+                            viewModel.updateProfile(
+                                profile.copy(systemPrompt = it)
+                            )
+                        },
+                        placeholder = "留空则不注入。切换配置组即切换人设",
+                        singleLine = false
+                    )
+                }
                 SettingsCategoryTitle("接口配置")
                 SettingsGroup {
                     // 明文显示：便于核对与修改，Key 只存在本机

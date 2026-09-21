@@ -270,7 +270,7 @@ class SettingsRepository(
                 geminiSearchEnabled = prefs[geminiSearchKey] ?: false,
                 inAppBrowserEnabled = prefs[inAppBrowserKey] ?: true,
                 searchEngine = prefs[searchEngineKey] ?: SearchEngine.BING.id,
-                systemPrompt = prefs[systemPromptKey].orEmpty()
+                systemPrompt = active.systemPrompt
             )
         } else {
             val provider = AiProvider.fromId(prefs[providerKey])

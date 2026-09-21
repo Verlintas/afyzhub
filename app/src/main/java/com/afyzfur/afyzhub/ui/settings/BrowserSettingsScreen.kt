@@ -35,12 +35,15 @@ class BrowserSettingsViewModel(
     val browserEnabled: StateFlow<Boolean> = _browserEnabled.asStateFlow()
     private val _searchEngine = MutableStateFlow(SearchEngine.DEFAULT)
     val searchEngine: StateFlow<SearchEngine> = _searchEngine.asStateFlow()
+    private val _aiWebSearch = MutableStateFlow(false)
+    val aiWebSearch: StateFlow<Boolean> = _aiWebSearch.asStateFlow()
 
     init {
         viewModelScope.launch {
             val settings = settingsRepository.current()
             _browserEnabled.value = settings.inAppBrowserEnabled
             _searchEngine.value = SearchEngine.fromId(settings.searchEngine)
+            _aiWebSearch.value = settings.webSearchEnabled
         }
     }
 
@@ -52,6 +55,11 @@ class BrowserSettingsViewModel(
     fun setSearchEngine(value: SearchEngine) {
         _searchEngine.value = value
         viewModelScope.launch { settingsRepository.setSearchEngine(value.id) }
+    }
+
+    fun setAiWebSearch(value: Boolean) {
+        _aiWebSearch.value = value
+        viewModelScope.launch { settingsRepository.setWebSearchEnabled(value) }
     }
 }
 
@@ -68,6 +76,7 @@ fun BrowserSettingsScreen(
 ) {
     val browserEnabled by viewModel.browserEnabled.collectAsState()
     val engine by viewModel.searchEngine.collectAsState()
+    val aiWebSearch by viewModel.aiWebSearch.collectAsState()
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxSize()
@@ -95,6 +104,14 @@ fun BrowserSettingsScreen(
                 }
                 SettingsCategoryTitle("联网搜索")
                 SettingsGroup {
+                    SettingsSwitchItem(
+                        icon = Icons.Default.Search,
+                        title = "AI 联网搜索",
+                        subtitle = "非 Gemini 模型的应用内搜索（Gemini 在 API 配置中开启）",
+                        checked = aiWebSearch,
+                        onCheckedChange = viewModel::setAiWebSearch
+                    )
+                    SettingsItemDivider()
                     SettingsDropdownItem(
                         icon = Icons.Default.Search,
                         title = "搜索引擎",

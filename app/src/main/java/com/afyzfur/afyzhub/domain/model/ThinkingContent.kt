@@ -154,7 +154,7 @@ sealed class ContentBlock {
 
 /** 顺序化拆分: 思考(闭合/未闭合)、搜索标签、其余正文 */
 fun parseContentBlocks(content: String): List<ContentBlock> {
-    data class Marker(val start: Int, val end: Int, val block: ContentBlock)
+    data class Marker(val start: Int, val end: Int, val block: ContentBlock?)
 
     val markers = mutableListOf<Marker>()
 
@@ -183,6 +183,12 @@ fun parseContentBlocks(content: String): List<ContentBlock> {
         if (q.isNotEmpty()) markers.add(Marker(m.range.first, content.length, ContentBlock.Search(q)))
     }
 
+    // sources 块不作为内容块输出: 来源由 parseSearchSources 独立解析
+    // 渲染成搜索块内的列表, 这里只负责把它从正文范围里剔除
+    for (m in SOURCES_TAG.findAll(content)) {
+        markers.add(Marker(m.range.first, m.range.last + 1, null))
+    }
+
     if (markers.isEmpty()) {
         return if (content.isBlank()) emptyList() else listOf(ContentBlock.Answer(content.trim()))
     }
@@ -195,7 +201,8 @@ fun parseContentBlocks(content: String): List<ContentBlock> {
             val between = content.substring(cursor, mk.start).trim()
             if (between.isNotEmpty()) out.add(ContentBlock.Answer(between))
         }
-        out.add(mk.block)
+        // block 为 null 表示 sources 块: 只剔除不产出
+        mk.block?.let { out.add(it) }
         cursor = maxOf(cursor, mk.end)
     }
     if (cursor < content.length) {
