@@ -38,7 +38,7 @@ class BrowserSettingsViewModel(
 
     init {
         viewModelScope.launch {
-            val settings = settingsRepository.settingsFlow.value
+            val settings = settingsRepository.current()
             _browserEnabled.value = settings.inAppBrowserEnabled
             _searchEngine.value = SearchEngine.fromId(settings.searchEngine)
         }

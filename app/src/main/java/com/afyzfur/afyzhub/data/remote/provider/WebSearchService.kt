@@ -164,7 +164,7 @@ class WebSearchService(
     private fun parseBaidu(html: String, maxResults: Int): List<Result> {
         val out = mutableListOf<Result>()
         val blockPattern = Regex(
-            "<h3[^>]*>\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+            "<h3[^>]*>\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
             RegexOption.DOT_MATCHES_ALL
         )
         for (m in blockPattern.findAll(html)) {

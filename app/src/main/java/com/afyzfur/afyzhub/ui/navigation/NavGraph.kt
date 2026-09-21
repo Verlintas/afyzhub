@@ -19,6 +19,7 @@ import com.afyzfur.afyzhub.ui.browser.InAppBrowserScreen
 import com.afyzfur.afyzhub.ui.settings.QuickPromptsSettingsScreen
 import com.afyzfur.afyzhub.ui.settings.RequestLogScreen
 import com.afyzfur.afyzhub.ui.settings.SettingsHomeScreen
+import com.afyzfur.afyzhub.ui.settings.BrowserSettingsScreen
 
 /**
  * 导航目的地。
@@ -63,19 +64,19 @@ sealed class Screen(val route: String) {
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
+    // 内置浏览器总开关: 链接点开后走内置还是系统浏览器
+    val settingsRepo: com.afyzfur.afyzhub.data.settings.SettingsRepository =
+        org.koin.java.KoinJavaComponent.get(
+            com.afyzfur.afyzhub.data.settings.SettingsRepository::class.java
+        )
+    val browserEnabled by settingsRepo.settings.collectAsState(initial = true)
 
     NavHost(
         navController = navController,
         startDestination = Screen.Chat.route
     ) {
-        // 内置浏览器总开关: 设置页可改, 这里只读分流
-        val settingsRepository: com.afyzfur.afyzhub.data.settings.SettingsRepository =
-            org.koin.java.KoinJavaComponent.get(
-                com.afyzfur.afyzhub.data.settings.SettingsRepository::class.java
-            )
-        val browserEnabled by settingsRepository.settings
-            .collectAsState(initial = true)
         composable(Screen.Chat.route) {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
             ChatScreen(
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
@@ -92,7 +93,7 @@ fun NavGraph() {
                             android.content.Intent.ACTION_VIEW,
                             android.net.Uri.parse(url)
                         ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        runCatching { it.context.startActivity(intent) }
+                        runCatching { ctx.startActivity(intent) }
                     }
                 }
             )
