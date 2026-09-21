@@ -35,16 +35,20 @@ data class ThinkingContent(
  * 参考 RikkaHub 的 ThinkTagTransformer 的处理思路。
  */
 fun parseThinking(content: String): ThinkingContent {
-    val closed = CLOSED_THINK.find(content)
-    if (closed != null) {
-        // 组 1 是标签名（反向引用要用它配对闭合标签），组 2 才是内容
-        val reasoning = closed.groupValues[2].trim()
-        // 移除整段标签后剩下的就是回答。用 removeRange 而非 replace，
-        // 避免回答里恰好含有相同文本时被误删
-        val answer = content.removeRange(closed.range).trim()
+    // 收集全部闭合思考块：搜索触发的二次回复会让一条消息里出现
+    // 两段思考（首轮 + 二轮），只取第一段会把后面的当成正文丢进
+    // 回答里。按出现顺序用空行合并，阅读顺序与产生顺序一致
+    val blocks = CLOSED_THINK.findAll(content).toList()
+    if (blocks.isNotEmpty()) {
+        val reasoning = blocks.joinToString("\n\n") { it.groupValues[2].trim() }
+            .trim().ifBlank { null }
+        var answer = content
+        for (b in blocks.asReversed()) {
+            answer = answer.removeRange(b.range)
+        }
         return ThinkingContent(
-            reasoning = reasoning.ifBlank { null },
-            answer = answer,
+            reasoning = reasoning,
+            answer = answer.trim(),
             thinking = false
         )
     }
@@ -99,6 +103,31 @@ private val SEARCH_TAG = Regex(
 /** 提取搜索词, 无标签或内容为空时返回 null */
 fun parseSearchQuery(content: String): String? =
     SEARCH_TAG.find(content)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
+
+/**
+ * 搜索来源块解析。
+ *
+ * 搜索完成后发送流程把"标题 :: 链接"行包进 sources 标签
+ * 追加在回复末尾。UI 渲染成可展开的来源列表，正文里剥除。
+ */
+private val SOURCES_TAG = Regex(
+    """<sources>(.*?)</sources>""",
+    RegexOption.DOT_MATCHES_ALL
+)
+
+/** 解析 sources 块内的条目(每行 "标题 :: 链接") */
+fun parseSearchSources(content: String): List<Pair<String, String>> {
+    val block = SOURCES_TAG.find(content)?.groupValues?.get(1) ?: return emptyList()
+    return block.lines().mapNotNull { line ->
+        val idx = line.lastIndexOf(" :: ")
+        if (idx <= 0) null else line.substring(0, idx).trim() to
+            line.substring(idx + 4).trim()
+    }.filter { it.second.startsWith("http") }
+}
+
+/** 剥除正文中的来源块 */
+fun stripSearchSources(content: String): String =
+    SOURCES_TAG.replace(content, "").trim()
 
 /** 剥除正文中的搜索标签, 未闭合的开标签一并清掉 */
 fun stripSearchTag(content: String): String = SEARCH_TAG.replace(content, "")

@@ -1,6 +1,8 @@
 package com.afyzfur.afyzhub.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -50,6 +52,8 @@ sealed class Screen(val route: String) {
     object AppearanceSettings : Screen("settings/appearance")
     object ChatAppearanceSettings : Screen("settings/chat_appearance")
     object MessageDisplaySettings : Screen("settings/message_display")
+    /** 内置浏览器设置: 链接打开方式与联网搜索引擎 */
+    object BrowserSettings : Screen("settings/browser")
     object QuickPromptsSettings : Screen("settings/quick_prompts")
     object RequestLog : Screen("settings/request_log")
     object AboutSettings : Screen("settings/about")
@@ -64,6 +68,13 @@ fun NavGraph() {
         navController = navController,
         startDestination = Screen.Chat.route
     ) {
+        // 内置浏览器总开关: 设置页可改, 这里只读分流
+        val settingsRepository: com.afyzfur.afyzhub.data.settings.SettingsRepository =
+            org.koin.java.KoinJavaComponent.get(
+                com.afyzfur.afyzhub.data.settings.SettingsRepository::class.java
+            )
+        val browserEnabled by settingsRepository.settings
+            .collectAsState(initial = true)
         composable(Screen.Chat.route) {
             ChatScreen(
                 onNavigateToSettings = {
@@ -73,7 +84,16 @@ fun NavGraph() {
                     navController.navigate(Screen.ApiProfiles.route)
                 },
                 onOpenBrowser = { url ->
-                    navController.navigate(Screen.Browser.routeFor(url))
+                    if (browserEnabled) {
+                        navController.navigate(Screen.Browser.routeFor(url))
+                    } else {
+                        // 总开关关闭: 交给系统浏览器处理
+                        val intent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(url)
+                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        runCatching { it.context.startActivity(intent) }
+                    }
                 }
             )
         }
@@ -101,6 +121,9 @@ fun NavGraph() {
                 },
                 onNavigateToAbout = {
                     navController.navigate(Screen.AboutSettings.route)
+                },
+                onNavigateToBrowser = {
+                    navController.navigate(Screen.BrowserSettings.route)
                 }
             )
         }
@@ -152,6 +175,9 @@ fun NavGraph() {
         }
         composable(Screen.MessageDisplaySettings.route) {
             MessageDisplaySettingsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.BrowserSettings.route) {
+            BrowserSettingsScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable(Screen.QuickPromptsSettings.route) {

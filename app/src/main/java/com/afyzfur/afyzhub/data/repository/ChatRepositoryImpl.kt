@@ -15,6 +15,9 @@ import com.afyzfur.afyzhub.data.settings.AppSettings
 import com.afyzfur.afyzhub.data.settings.SettingsProvider
 import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.Conversation
+
+private const val LT = "<"
+private const val GT = ">"
 import com.afyzfur.afyzhub.domain.model.ConversationItem
 import com.afyzfur.afyzhub.domain.model.Message
 import com.afyzfur.afyzhub.domain.model.SendPhase
@@ -24,6 +27,10 @@ import kotlinx.coroutines.withContext
 import com.afyzfur.afyzhub.util.Constants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+
+/** 搜索来源块: 记录本次回复实际用到的搜索结果, UI 渲染为可展开列表 */
+private const val SEARCH_SOURCES_OPEN = LT + "sources" + GT
+private const val SEARCH_SOURCES_CLOSE = LT + "/sources" + GT
 
 class ChatRepositoryImpl(
     private val conversationDao: ConversationDao,
@@ -161,9 +168,18 @@ class ChatRepositoryImpl(
                 settings.provider != AiProvider.GEMINI
             ) {
                 onPhase(SendPhase.SEARCHING)
-                val results = webSearchService.search(searchQuery)
+                val results = webSearchService.search(searchQuery, engineId = settings.searchEngine)
+                // 结果已拿到，进入读取整理阶段；结果为空时直接跳过
+                // BROWSING，让模型按无结果路径兜底回答
+                if (results.isNotEmpty()) onPhase(SendPhase.BROWSING)
+                // 搜索到的页面以 sources 块附在回复后: UI 解析渲染
+                // 为可展开的来源列表, 二轮请求里模型也能看到自己"查过什么"
+                val sourcesBlock = if (results.isEmpty()) "" else "\n" +
+                    SEARCH_SOURCES_OPEN + "\n" +
+                    results.joinToString("\n") { it.title.replace('\n', ' ') + " :: " + it.url } +
+                    "\n" + SEARCH_SOURCES_CLOSE
                 val searchedTurns = turns + listOf(
-                    ChatTurn(role = "assistant", content = reply),
+                    ChatTurn(role = "assistant", content = reply + sourcesBlock),
                     ChatTurn(
                         role = "user",
                         content = "以下是「" + searchQuery + "」的搜索结果：\n\n" +

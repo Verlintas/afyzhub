@@ -16,6 +16,24 @@ import com.afyzfur.afyzhub.data.settings.AppSettings
  * 提取标题、摘要与链接。稳定性依赖第三方页面结构，但作为
  * "聊天下文的补充信息"够用——失败时静默降级为无搜索继续回答。
  */
+/**
+ * 联网搜索引擎。
+ *
+ * 默认 Bing：对移动 UA 最宽容且无地域墙。百度作为国内网络
+ * 环境的可靠备选，Google 需要设备本身可达。选择存于设置，
+ * 搜索时若所选引擎失败会自动按 BING → BAIDU → GOOGLE 降级。
+ */
+enum class SearchEngine(val id: String, val label: String) {
+    BING("bing", "Bing"),
+    BAIDU("baidu", "百度"),
+    GOOGLE("google", "Google");
+    companion object {
+        val DEFAULT = BING
+        fun fromId(id: String?): SearchEngine =
+            entries.firstOrNull { it.id == id } ?: DEFAULT
+    }
+}
+
 class WebSearchService(
     private val transport: Transport
 ) {
@@ -33,41 +51,70 @@ class WebSearchService(
      * 任何异常都返回空列表：搜索是增强能力，失败不该让整条消息
      * 发送失败——模型会按无搜索结果继续回答（通常会说明信息不足）。
      */
-    suspend fun search(query: String, maxResults: Int = 5): List<Result> {
+    /**
+     * 执行搜索，返回前 [maxResults] 条结果。
+     *
+     * 先按用户设置的引擎查，空结果或异常时按固定顺序降级到
+     * 其余引擎——各家反爬策略不同，单一引擎可靠性不够。
+     * 全部失败才返回空列表：搜索是增强能力，失败不该让整条
+     * 消息发送失败，模型会按无结果路径兜底回答。
+     */
+    suspend fun search(query: String, maxResults: Int = 5, engineId: String? = null): List<Result> {
         if (query.isBlank()) return emptyList()
-        return try {
-            val html = transport.getForText(
-                baseUrl = "https://html.duckduckgo.com",
-                path = "/html/",
-                headers = mapOf(
-                    "User-Agent" to "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36"
-                ),
-                query = mapOf("q" to query),
-                logContext = RequestLogContext(
-                    provider = "web-search",
-                    model = "duckduckgo"
-                )
-            )
-            val first = parseResults(html, maxResults)
-            // DuckDuckGo 被反爬或网络受限时结果为空, 换 Bing 再试。
-            // 两家都失败才返回空, 让模型走无结果兜底路径
-            if (first.isNotEmpty()) return first
-            val bingHtml = transport.getForText(
-                baseUrl = "https://www.bing.com",
-                path = "/search",
-                headers = mapOf(
-                    "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36"
-                ),
-                query = mapOf("q" to query),
-                logContext = RequestLogContext(
-                    provider = "web-search",
-                    model = "bing"
-                )
-            )
-            return parseBing(bingHtml, maxResults)
-        } catch (_: Exception) {
-            emptyList()
+        val preferred = SearchEngine.fromId(engineId)
+        val order = listOf(preferred) + SearchEngine.entries.filter { it != preferred }
+        for (engine in order) {
+            val results = try {
+                when (engine) {
+                    SearchEngine.BING -> searchBing(query, maxResults)
+                    SearchEngine.BAIDU -> searchBaidu(query, maxResults)
+                    SearchEngine.GOOGLE -> searchGoogle(query, maxResults)
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (results.isNotEmpty()) return results
         }
+        return emptyList()
+    }
+    private suspend fun searchBing(query: String, maxResults: Int): List<Result> {
+        val html = transport.getForText(
+            baseUrl = "https://www.bing.com",
+            path = "/search",
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36",
+                "Accept-Language" to "zh-CN,zh;q=0.9"
+            ),
+            query = mapOf("q" to query, "setmkt" to "zh-CN"),
+            logContext = RequestLogContext(provider = "web-search", model = "bing")
+        )
+        return parseBing(html, maxResults)
+    }
+    private suspend fun searchBaidu(query: String, maxResults: Int): List<Result> {
+        val html = transport.getForText(
+            baseUrl = "https://www.baidu.com",
+            path = "/s",
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36",
+                "Accept" to "text/html,application/xhtml+xml"
+            ),
+            query = mapOf("wd" to query, "rn" to maxResults.toString()),
+            logContext = RequestLogContext(provider = "web-search", model = "baidu")
+        )
+        return parseBaidu(html, maxResults)
+    }
+    private suspend fun searchGoogle(query: String, maxResults: Int): List<Result> {
+        val html = transport.getForText(
+            baseUrl = "https://www.google.com",
+            path = "/search",
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36",
+                "Accept-Language" to "zh-CN,zh;q=0.9"
+            ),
+            query = mapOf("q" to query, "num" to maxResults.toString()),
+            logContext = RequestLogContext(provider = "web-search", model = "google")
+        )
+        return parseGoogle(html, maxResults)
     }
 
     /**
@@ -105,6 +152,52 @@ class WebSearchService(
         return links.zip(snippets) { link, snippet ->
             link.copy(snippet = snippet)
         }.take(maxResults)
+    }
+
+    /**
+     * 解析百度 PC 版结果页。
+     *
+     * 结果标题与链接在 h3 > a 内，链接多为百度跳转格式
+     * (/link?url=)，点击后由百度 302 到真址——直接存跳转
+     * 链接即可，内置浏览器会跟随重定向。
+     */
+    private fun parseBaidu(html: String, maxResults: Int): List<Result> {
+        val out = mutableListOf<Result>()
+        val blockPattern = Regex(
+            "<h3[^>]*>\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+            RegexOption.DOT_MATCHES_ALL
+        )
+        for (m in blockPattern.findAll(html)) {
+            val url = m.groupValues[1]
+            if (url.startsWith("http") || url.startsWith("/link")) {
+                val full = if (url.startsWith("/")) "https://www.baidu.com" + url else url
+                out += Result(stripTags(m.groupValues[2]), "", full)
+                if (out.size >= maxResults) break
+            }
+        }
+        return out
+    }
+
+    /**
+     * 解析 Google 结果页。
+     *
+     * 结果块以 div.g 开始，标题在第一个 h3，链接取块内第一个
+     * 非 google 域的 http 链接。
+     */
+    private fun parseGoogle(html: String, maxResults: Int): List<Result> {
+        val blocks = html.split("<div class=\"g\"").drop(1)
+        val out = mutableListOf<Result>()
+        for (b in blocks) {
+            val title = Regex("<h3[^>]*>(.*?)</h3>", RegexOption.DOT_MATCHES_ALL)
+                .find(b)?.groupValues?.get(1) ?: continue
+            val url = Regex("href=\"(https?://[^\"]+)\"").findAll(b)
+                .map { it.groupValues[1] }
+                .firstOrNull { !it.contains("google.") && !it.contains("gstatic.") }
+                ?: continue
+            out += Result(stripTags(title), "", url)
+            if (out.size >= maxResults) break
+        }
+        return out
     }
 
     /**
@@ -163,9 +256,10 @@ class WebSearchService(
          */
         fun instruction(): String = """
             |你可以使用网络搜索。当且仅当回答需要你无法确定的实时或具体信息时，
-            |先输出一行 `<search>搜索词</search>`（搜索词为你会输入搜索引擎的
-            |关键词），然后停止输出。系统会执行搜索并把结果提供给你，你再基于
-            |结果继续回答。如果已有足够信息，直接回答，不要使用该标签。
+            |先输出一行 <search>搜索词</search>（标签内是你会输入搜索引擎的关键词，
+            |例如 <search>2025 诺贝尔物理学奖</search>），然后立即停止输出，不要输出其他任何内容。
+            |系统检测到该标签后会执行搜索并把结果提供给你，你再基于结果继续回答。
+            |如果已有足够信息回答，直接回答，不要输出该标签。
         """.trimMargin()
 
         /** 从模型输出中提取搜索查询词 */

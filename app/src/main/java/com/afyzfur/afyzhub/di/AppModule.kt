@@ -37,5 +37,6 @@ val appModule = module {
     // 图片存取需要 Context，用 androidContext() 注入
     single { ImageStore(androidContext()) }
     viewModel { UiPreferencesViewModel(get(), get()) }
+    viewModel { com.afyzfur.afyzhub.ui.settings.BrowserSettingsViewModel(get()) }
     viewModel { RequestLogViewModel(get(), get()) }
 }

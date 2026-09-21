@@ -49,6 +49,14 @@ data class AppSettings(
     val thinkingEffort: ThinkingEffort = ThinkingEffort.DEFAULT,
     val webSearchEnabled: Boolean = false,
     /**
+     * 内置浏览器总开关。关闭时消息里的链接走系统浏览器。
+     * 它与联网搜索相互独立：搜索是模型取信息的通道，
+     * 这里只管"链接点开后在哪儿展示"。
+     */
+    val inAppBrowserEnabled: Boolean = true,
+    /** 联网搜索用的搜索引擎 id，取值见 [SearchEngine] */
+    val searchEngine: String = SearchEngine.BING.id,
+    /**
      * 系统提示词。空串表示不注入。
      *
      * 全局项而非按配置组：它描述"我希望这个助手是什么样"，
@@ -122,6 +130,8 @@ class SettingsRepository(
     private val inputBarDeepSeeThroughKey =
         booleanPreferencesKey(Constants.KEY_INPUT_BAR_DEEP_SEE_THROUGH)
     private val webSearchEnabledKey = booleanPreferencesKey(Constants.KEY_WEB_SEARCH_ENABLED)
+    private val inAppBrowserKey = booleanPreferencesKey(Constants.KEY_IN_APP_BROWSER)
+    private val searchEngineKey = stringPreferencesKey(Constants.KEY_SEARCH_ENGINE)
     private val systemPromptKey = stringPreferencesKey(Constants.KEY_SYSTEM_PROMPT)
     private val logRetentionKey = stringPreferencesKey(Constants.KEY_LOG_RETENTION)
     private val logEnabledKey = booleanPreferencesKey(Constants.KEY_LOG_ENABLED)
@@ -247,6 +257,8 @@ class SettingsRepository(
                 streamEnabled = prefs[streamKey] ?: true,
                 thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey]),
                 webSearchEnabled = prefs[webSearchEnabledKey] ?: false,
+                inAppBrowserEnabled = prefs[inAppBrowserKey] ?: true,
+                searchEngine = prefs[searchEngineKey] ?: SearchEngine.BING.id,
                 systemPrompt = prefs[systemPromptKey].orEmpty()
             )
         } else {
@@ -261,6 +273,8 @@ class SettingsRepository(
                 streamEnabled = prefs[streamKey] ?: true,
                 thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey]),
                 webSearchEnabled = prefs[webSearchEnabledKey] ?: false,
+                inAppBrowserEnabled = prefs[inAppBrowserKey] ?: true,
+                searchEngine = prefs[searchEngineKey] ?: SearchEngine.BING.id,
                 systemPrompt = prefs[systemPromptKey].orEmpty()
             )
         }
@@ -478,6 +492,12 @@ class SettingsRepository(
 
     suspend fun setWebSearchEnabled(enabled: Boolean) {
         dataStore.edit { it[webSearchEnabledKey] = enabled }
+    }
+    suspend fun setInAppBrowserEnabled(enabled: Boolean) {
+        dataStore.edit { it[inAppBrowserKey] = enabled }
+    }
+    suspend fun setSearchEngine(id: String) {
+        dataStore.edit { it[searchEngineKey] = id }
     }
 
     suspend fun setSystemPrompt(prompt: String) {

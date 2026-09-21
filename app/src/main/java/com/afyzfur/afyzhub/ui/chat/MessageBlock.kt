@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +37,8 @@ import com.afyzfur.afyzhub.data.settings.MessageDisplayOptions
 import com.afyzfur.afyzhub.domain.model.Message
 import com.afyzfur.afyzhub.domain.model.parseThinking
 import com.afyzfur.afyzhub.domain.model.parseSearchQuery
+import com.afyzfur.afyzhub.domain.model.parseSearchSources
+import com.afyzfur.afyzhub.domain.model.stripSearchSources
 import com.afyzfur.afyzhub.domain.model.stripSearchTag
 import com.afyzfur.afyzhub.ui.components.LocalImage
 import com.afyzfur.afyzhub.ui.components.ModelIcon
@@ -167,6 +170,10 @@ private fun MessageBody(
     val searchQuery = remember(message.content, fromUser) {
         if (fromUser) null else parseSearchQuery(message.content)
     }
+    // 搜索来源列表: 默认收起, 展开显示本次实际用到的页面
+    val searchSources = remember(message.content, fromUser) {
+        if (fromUser) emptyList() else parseSearchSources(message.content)
+    }
 
     val content: @Composable () -> Unit = {
         if (fromUser) {
@@ -182,7 +189,7 @@ private fun MessageBody(
         } else {
             MarkdownText(
                 // 用剥掉标签后的正文，否则 <think> 会原样显示
-                text = stripSearchTag(parsed?.answer ?: message.content),
+                text = stripSearchSources(stripSearchTag(parsed?.answer ?: message.content)),
                 color = if (style == BubbleStyle.BUBBLE) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
@@ -216,7 +223,11 @@ private fun MessageBody(
 
     // 搜索块: 与思考块同级的独立栏, 展示这次回复实际用了什么查询
     if (searchQuery != null) {
-        SearchBlock(query = searchQuery)
+        SearchBlock(
+            query = searchQuery,
+            sources = searchSources,
+            onLinkClick = onLinkClick
+        )
     }
 
     // 思考进行中而正文尚未开始时不渲染气泡，否则会出现一个空容器。
@@ -224,7 +235,7 @@ private fun MessageBody(
     //
     // 等待首 token 时（无思考、正文仍为空）同样不渲染：等 AI 开口
     // 之前界面上不该有任何占位框，进度由输入栏的阶段文字说明
-    val answerText = stripSearchTag(parsed?.answer ?: message.content)
+    val answerText = stripSearchSources(stripSearchTag(parsed?.answer ?: message.content))
     if (message.isSending && answerText.isBlank() && !fromUser) {
         return
     }
@@ -380,31 +391,65 @@ private fun FailedMessage(
 @Composable
 private fun SearchBlock(
     query: String,
-    modifier: Modifier = Modifier
+    sources: List<Pair<String, String>>,
+    modifier: Modifier = Modifier,
+    onLinkClick: ((String) -> Unit)? = null
 ) {
+    // 默认收起: 来源是佐证信息, 大多数时候不需要展开
+    var expanded by remember { mutableStateOf(false) }
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         shape = MaterialTheme.shapes.small,
         modifier = modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.size(8.dp))
-            Text(
-                text = "已联网搜索：$query",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = "已联网搜索：$query",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            // 展开的来源列表: 每行一个页面, 点击进内置浏览器
+            if (expanded && sources.isNotEmpty()) {
+                Column(modifier = Modifier.padding(start = 36.dp, end = 12.dp, bottom = 10.dp)) {
+                    sources.forEach { (title, url) ->
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onLinkClick?.invoke(url) }
+                                .padding(vertical = 3.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

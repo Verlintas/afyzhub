@@ -54,6 +54,7 @@ fun SettingsHomeScreen(
     onNavigateToQuickPrompts: () -> Unit,
     onNavigateToRequestLog: () -> Unit,
     onNavigateToAbout: () -> Unit,
+    onNavigateToBrowser: () -> Unit,
     uiPreferencesViewModel: UiPreferencesViewModel = koinViewModel(),
     settingsViewModel: SettingsViewModel = koinViewModel(),
     apiProfilesViewModel: ApiProfilesViewModel = koinViewModel()
@@ -154,6 +155,12 @@ fun SettingsHomeScreen(
                         subtitle = "逐字显示回复，部分中转服务不支持",
                         checked = streamEnabled,
                         onCheckedChange = settingsViewModel::updateStreamEnabled
+                    )
+                    SettingsNavItem(
+                        icon = Icons.Default.Search,
+                        title = "内置浏览器",
+                        subtitle = "链接打开方式与联网搜索引擎",
+                        onClick = onNavigateToBrowser
                     )
                     SettingsSwitchItem(
                         icon = Icons.Default.Search,

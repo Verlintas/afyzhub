@@ -61,6 +61,8 @@ object Constants {
     /** 输入栏是否增强透视（连文字一起半透，可看到背后的消息） */
     const val KEY_INPUT_BAR_DEEP_SEE_THROUGH = "chat_input_bar_deep_see_through"
     const val KEY_WEB_SEARCH_ENABLED = "web_search_enabled"
+    const val KEY_IN_APP_BROWSER = "in_app_browser_enabled"
+    const val KEY_SEARCH_ENGINE = "search_engine"
 
     /** 系统提示词。全局项，每次发送时注入对话头部 */
     const val KEY_SYSTEM_PROMPT = "system_prompt"

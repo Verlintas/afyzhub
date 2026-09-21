@@ -22,7 +22,9 @@ enum class SendPhase {
     RECEIVING,
 
     /** 应用层联网搜索：抓取搜索结果中 */
-    SEARCHING;
+    SEARCHING,
+    /** 读取与整理搜索到的页面，准备二次请求 */
+    BROWSING;
 
     /** 是否有进行中的请求。用于控制发送按钮与暂停按钮的切换 */
     val isActive: Boolean get() = this != IDLE
@@ -35,5 +37,6 @@ enum class SendPhase {
             WAITING -> "正在等待模型响应"
             RECEIVING -> "正在接收回复"
             SEARCHING -> "正在搜索网络"
+            BROWSING -> "正在浏览网页"
         }
 }
