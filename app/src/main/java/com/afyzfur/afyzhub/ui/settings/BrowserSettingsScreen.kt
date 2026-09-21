@@ -88,7 +88,7 @@ fun BrowserSettingsScreen(
                     SettingsSwitchItem(
                         icon = IconPalette,
                         title = "应用内打开链接",
-                        subtitle = "关闭后消息里的链接改用系统浏览器",
+                        subtitle = "关闭后链接改用系统浏览器打开，且 AI 无法使用联网搜索",
                         checked = browserEnabled,
                         onCheckedChange = viewModel::setBrowserEnabled
                     )

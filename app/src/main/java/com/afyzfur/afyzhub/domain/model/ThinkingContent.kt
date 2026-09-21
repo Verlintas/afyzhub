@@ -133,3 +133,78 @@ fun stripSearchSources(content: String): String =
 fun stripSearchTag(content: String): String = SEARCH_TAG.replace(content, "")
     .replace(Regex("""<search>.*""", RegexOption.DOT_MATCHES_ALL), "")
     .trim()
+
+
+/**
+ * 消息内容的顺序化拆分。
+ *
+ * 搜索场景下一条回复会交替出现多段内容：思考 → 搜索标签 →
+ * （搜索后）思考 → 正文。之前的合并式解析会把不同段的思考
+ * 揉在一起、搜索块与正文的位置关系丢失。这里按出现顺序切分，
+ * UI 依次渲染多个块，段与段之间的先后关系一目了然。
+ */
+sealed class ContentBlock {
+    /** 一段思考过程。[ongoing] 为真表示流式还没收到闭合标签 */
+    data class Think(val text: String, val ongoing: Boolean) : ContentBlock()
+    /** 一次联网搜索请求 */
+    data class Search(val query: String) : ContentBlock()
+    /** 正文文本段。多段正文按顺序拼接显示 */
+    data class Answer(val text: String) : ContentBlock()
+}
+
+/** 顺序化拆分: 思考(闭合/未闭合)、搜索标签、其余正文 */
+fun parseContentBlocks(content: String): List<ContentBlock> {
+    data class Marker(val start: Int, val end: Int, val block: ContentBlock)
+
+    val markers = mutableListOf<Marker>()
+
+    for (m in CLOSED_THINK.findAll(content)) {
+        markers.add(Marker(m.range.first, m.range.last + 1, ContentBlock.Think(m.groupValues[2].trim(), false)))
+    }
+    // 流式进行中的未闭合思考: 开标签之后到字符串末尾
+    if (markers.isEmpty()) {
+        val open = OPEN_THINK.find(content)
+        if (open != null) {
+            markers.add(Marker(open.range.first, content.length, ContentBlock.Think(open.groupValues[1].trim(), true)))
+        }
+    }
+    for (m in SEARCH_TAG.findAll(content)) {
+        val q = m.groupValues[1].trim()
+        if (q.isNotEmpty()) markers.add(Marker(m.range.first, m.range.last + 1, ContentBlock.Search(q)))
+    }
+    // 搜索标签被截断的流式中间态: 只有开标签
+    val openSearch = Regex(
+        """<search>.*""",
+        RegexOption.DOT_MATCHES_ALL
+    )
+    if (openSearch.findAll(content).count() > SEARCH_TAG.findAll(content).count()) {
+        val m = openSearch.find(content)!!
+        val q = m.value.removePrefix("""<search>""").trim()
+        if (q.isNotEmpty()) markers.add(Marker(m.range.first, content.length, ContentBlock.Search(q)))
+    }
+
+    if (markers.isEmpty()) {
+        return if (content.isBlank()) emptyList() else listOf(ContentBlock.Answer(content.trim()))
+    }
+
+    markers.sortBy { it.start }
+    val out = mutableListOf<ContentBlock>()
+    var cursor = 0
+    for (mk in markers) {
+        if (mk.start > cursor) {
+            val between = content.substring(cursor, mk.start).trim()
+            if (between.isNotEmpty()) out.add(ContentBlock.Answer(between))
+        }
+        out.add(mk.block)
+        cursor = maxOf(cursor, mk.end)
+    }
+    if (cursor < content.length) {
+        val tail = content.substring(cursor).trim()
+        if (tail.isNotEmpty()) out.add(ContentBlock.Answer(tail))
+    }
+    return out
+}
+
+/** 所有正文段拼接(用于持久化摘要等场景) */
+fun joinAnswerBlocks(blocks: List<ContentBlock>): String =
+    blocks.filterIsInstance<ContentBlock.Answer>().joinToString("\n\n") { it.text }.trim()

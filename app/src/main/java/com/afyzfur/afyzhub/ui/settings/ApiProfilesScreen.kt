@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.afyzfur.afyzhub.domain.model.ApiProfile
+import com.afyzfur.afyzhub.ui.theme.AppShapeTokens
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -87,8 +88,7 @@ fun ApiProfilesScreen(
                 store.grouped().forEach { (group, profiles) ->
                     SettingsCategoryTitle(group.ifBlank { "未分组" })
                     SettingsGroup {
-                        profiles.forEachIndexed { index, profile ->
-                            if (index > 0) SettingsItemDivider()
+                        profiles.forEach { profile ->
                             ProfileRow(
                                 profile = profile,
                                 selected = profile.id == store.active?.id,
@@ -174,53 +174,77 @@ private fun ProfileRow(
     onSelect: () -> Unit,
     onEdit: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    // 卡片式行: 卡片主体点击进编辑, 右侧"使用/使用中"chip 切换生效。
+    // 之前整行点击都是切换生效, 想改配置反而难进去; 圆形单选钮
+    // 也与整体风格不搭——选中态用主题色卡片+文字标识表达
+    Surface(
+        onClick = onEdit,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        shape = AppShapeTokens.SettingsGroup,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
+            .padding(horizontal = 4.dp, vertical = 4.dp)
     ) {
-        RadioButton(
-            selected = selected,
-            // 点击由整行承接：按钮自身不再响应，避免一行出现两个涟漪
-            onClick = null
-        )
-        Spacer(Modifier.size(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = profile.displayName,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                // Key 是否填过比 Key 本身更有用，列表里不该露出明文
-                text = buildString {
-                    append(profile.effectiveModel)
-                    if (profile.apiKey.isBlank()) append("　未填 Key")
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = if (profile.apiKey.isBlank()) {
-                    MaterialTheme.colorScheme.error
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = profile.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    // Key 是否填过比 Key 本身更有用，列表里不该露出明文
+                    text = buildString {
+                        append(profile.effectiveModel)
+                        if (profile.apiKey.isBlank()) append("　未填 Key")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (profile.apiKey.isBlank()) {
+                        MaterialTheme.colorScheme.error
+                    } else if (selected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // 生效切换: 独立可点的 chip, 语义一目了然
+            Surface(
+                onClick = onSelect,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    MaterialTheme.colorScheme.surfaceContainerHighest
                 },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        // 编辑是低频操作，收成图标按钮，不占整行的点击区
-        IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "编辑",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = if (selected) "使用中" else "使用",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
         }
     }
 }

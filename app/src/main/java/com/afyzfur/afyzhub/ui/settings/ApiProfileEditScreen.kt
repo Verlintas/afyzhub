@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.ApiProfile
 import com.afyzfur.afyzhub.ui.components.IconKey
+import com.afyzfur.afyzhub.ui.components.IconBolt
 import com.afyzfur.afyzhub.ui.theme.AppShapeTokens
 import org.koin.androidx.compose.koinViewModel
 
@@ -53,10 +54,13 @@ fun ApiProfileEditScreen(
     onNavigateBack: () -> Unit,
     onNavigateToModels: () -> Unit,
     viewModel: ApiProfilesViewModel = koinViewModel(),
-    modelsViewModel: ProfileModelsViewModel = koinViewModel()
+    modelsViewModel: ProfileModelsViewModel = koinViewModel(),
+    settingsViewModel: SettingsViewModel = koinViewModel()
 ) {
     val store by viewModel.store.collectAsState()
     val profile = store.profiles.firstOrNull { it.id == profileId }
+    // Gemini 原生搜索开关: 全局项但只在此页(provider=GEMINI 时)出现
+    val geminiSearchEnabled by settingsViewModel.geminiSearchEnabled.collectAsState()
 
     if (profile == null) {
         // 这一组已不存在，没什么可编辑的
@@ -142,6 +146,18 @@ fun ApiProfileEditScreen(
                             )
                         }
                     )
+                    // 仅 Gemini 协议显示: 原生搜索是 Gemini 服务端
+                    // grounding 能力, 其他提供商没有对应实现
+                    if (profile.provider == AiProvider.GEMINI) {
+                        SettingsItemDivider()
+                        SettingsSwitchItem(
+                            icon = IconBolt,
+                            title = "原生联网搜索",
+                            subtitle = "Google 服务端搜索接地，仅 Gemini 协议可用",
+                            checked = geminiSearchEnabled,
+                            onCheckedChange = settingsViewModel::updateGeminiSearchEnabled
+                        )
+                    }
                 }
 
                 SettingsCategoryTitle("接口配置")

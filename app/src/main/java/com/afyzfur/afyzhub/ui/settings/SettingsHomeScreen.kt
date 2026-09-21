@@ -165,7 +165,7 @@ fun SettingsHomeScreen(
                     SettingsSwitchItem(
                         icon = Icons.Default.Search,
                         title = "联网搜索",
-                        subtitle = "启用模型原生联网搜索（当前仅 Gemini 支持）",
+                        subtitle = "非 Gemini 模型的应用内联网搜索（Gemini 在 API 配置中单独开启）",
                         checked = webSearchEnabled,
                         onCheckedChange = settingsViewModel::updateWebSearchEnabled
                     )

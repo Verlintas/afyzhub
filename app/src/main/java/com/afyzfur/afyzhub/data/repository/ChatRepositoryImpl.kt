@@ -165,6 +165,7 @@ class ChatRepositoryImpl(
             val searchQuery = WebSearchService.extractQuery(reply)
             if (searchQuery != null &&
                 settings.webSearchEnabled &&
+                settings.inAppBrowserEnabled &&
                 settings.provider != AiProvider.GEMINI
             ) {
                 onPhase(SendPhase.SEARCHING)
@@ -193,8 +194,8 @@ class ChatRepositoryImpl(
                     client.complete(searchedTurns, settings)
                 }
                 searchUsage = secondOutcome.usage ?: searchUsage
-                reply = secondOutcome.content
-                if (reply.isBlank()) {
+                reply = secondOutcome.content + sourcesBlock
+                if (secondOutcome.content.isBlank()) {
                     throw IllegalStateException("模型返回内容为空")
                 }
             }
@@ -438,6 +439,7 @@ class ChatRepositoryImpl(
         // Gemini 的服务端 grounding 质量更高，保持原生路径
         val searchInstruction = if (
             settings.webSearchEnabled &&
+            settings.inAppBrowserEnabled &&
             settings.provider != AiProvider.GEMINI
         ) {
             WebSearchService.instruction()

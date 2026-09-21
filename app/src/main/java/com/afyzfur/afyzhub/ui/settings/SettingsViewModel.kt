@@ -34,6 +34,8 @@ class SettingsViewModel(
     val streamEnabled: StateFlow<Boolean> = _streamEnabled.asStateFlow()
     private val _webSearchEnabled = MutableStateFlow(false)
     val webSearchEnabled: StateFlow<Boolean> = _webSearchEnabled.asStateFlow()
+    private val _geminiSearchEnabled = MutableStateFlow(false)
+    val geminiSearchEnabled: StateFlow<Boolean> = _geminiSearchEnabled.asStateFlow()
 
     private val _systemPrompt = MutableStateFlow("")
     val systemPrompt: StateFlow<String> = _systemPrompt.asStateFlow()
@@ -209,9 +211,19 @@ class SettingsViewModel(
         _webSearchEnabled.value = value
         viewModelScope.launch { settingsRepository.setWebSearchEnabled(value) }
     }
+    fun updateGeminiSearchEnabled(value: Boolean) {
+        _geminiSearchEnabled.value = value
+        viewModelScope.launch { settingsRepository.setGeminiSearchEnabled(value) }
+    }
+    /** 内置浏览器设置页用: 状态由该页的专属 ViewModel 持有, 这里不镜像 */
+
 
     /** 进入设置页时回填已保存的系统提示词 */
     fun loadSystemPrompt() {
+        viewModelScope.launch {
+            val s = settingsRepository.settingsFlow.first()
+            _geminiSearchEnabled.value = s.geminiSearchEnabled
+        }
         if (_systemPrompt.value.isEmpty()) {
             viewModelScope.launch {
                 _systemPrompt.value = settingsRepository.currentSystemPrompt()

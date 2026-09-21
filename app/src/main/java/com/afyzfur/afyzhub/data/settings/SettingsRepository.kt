@@ -58,6 +58,14 @@ data class AppSettings(
     /** 联网搜索用的搜索引擎 id，取值见 [SearchEngine] */
     val searchEngine: String = SearchEngine.BING.id,
     /**
+     * Gemini 原生联网搜索（服务端 grounding）。
+     *
+     * 只作用于 Gemini 协议，与其他模型的应用层搜索
+     * ([AppSettings.webSearchEnabled]) 相互独立。
+     * 放在 API 配置而非全局设置：它是协议能力，随配置组走。
+     */
+    val geminiSearchEnabled: Boolean = false,
+    /**
      * 系统提示词。空串表示不注入。
      *
      * 全局项而非按配置组：它描述"我希望这个助手是什么样"，
@@ -133,6 +141,7 @@ class SettingsRepository(
     private val webSearchEnabledKey = booleanPreferencesKey(Constants.KEY_WEB_SEARCH_ENABLED)
     private val inAppBrowserKey = booleanPreferencesKey(Constants.KEY_IN_APP_BROWSER)
     private val searchEngineKey = stringPreferencesKey(Constants.KEY_SEARCH_ENGINE)
+    private val geminiSearchKey = booleanPreferencesKey(Constants.KEY_GEMINI_SEARCH)
     private val systemPromptKey = stringPreferencesKey(Constants.KEY_SYSTEM_PROMPT)
     private val logRetentionKey = stringPreferencesKey(Constants.KEY_LOG_RETENTION)
     private val logEnabledKey = booleanPreferencesKey(Constants.KEY_LOG_ENABLED)
@@ -258,6 +267,7 @@ class SettingsRepository(
                 streamEnabled = prefs[streamKey] ?: true,
                 thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey]),
                 webSearchEnabled = prefs[webSearchEnabledKey] ?: false,
+                geminiSearchEnabled = prefs[geminiSearchKey] ?: false,
                 inAppBrowserEnabled = prefs[inAppBrowserKey] ?: true,
                 searchEngine = prefs[searchEngineKey] ?: SearchEngine.BING.id,
                 systemPrompt = prefs[systemPromptKey].orEmpty()
@@ -274,6 +284,7 @@ class SettingsRepository(
                 streamEnabled = prefs[streamKey] ?: true,
                 thinkingEffort = ThinkingEffort.fromId(prefs[thinkingEffortKey]),
                 webSearchEnabled = prefs[webSearchEnabledKey] ?: false,
+                geminiSearchEnabled = prefs[geminiSearchKey] ?: false,
                 inAppBrowserEnabled = prefs[inAppBrowserKey] ?: true,
                 searchEngine = prefs[searchEngineKey] ?: SearchEngine.BING.id,
                 systemPrompt = prefs[systemPromptKey].orEmpty()
@@ -499,6 +510,9 @@ class SettingsRepository(
     }
     suspend fun setSearchEngine(id: String) {
         dataStore.edit { it[searchEngineKey] = id }
+    }
+    suspend fun setGeminiSearchEnabled(enabled: Boolean) {
+        dataStore.edit { it[geminiSearchKey] = enabled }
     }
 
     suspend fun setSystemPrompt(prompt: String) {

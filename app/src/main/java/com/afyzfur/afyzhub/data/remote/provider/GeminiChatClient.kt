@@ -148,7 +148,7 @@ class GeminiChatClient(
             contents = contents,
             systemInstruction = systemPrompt?.let { Content(role = null, parts = listOf(Part(it))) },
             generationConfig = config,
-            tools = if (settings.webSearchEnabled) listOf(Tool(googleSearch = GoogleSearch())) else null
+            tools = if (settings.geminiSearchEnabled) listOf(Tool(googleSearch = GoogleSearch())) else null
         )
     }
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.afyzfur.afyzhub.data.settings.AvatarMode
@@ -40,6 +43,8 @@ import com.afyzfur.afyzhub.data.settings.ChatAppearance
 import com.afyzfur.afyzhub.data.settings.MessageDisplayOptions
 import com.afyzfur.afyzhub.domain.model.Message
 import com.afyzfur.afyzhub.domain.model.parseThinking
+import com.afyzfur.afyzhub.domain.model.ContentBlock
+import com.afyzfur.afyzhub.domain.model.parseContentBlocks
 import com.afyzfur.afyzhub.domain.model.parseSearchQuery
 import com.afyzfur.afyzhub.domain.model.parseSearchSources
 import com.afyzfur.afyzhub.domain.model.stripSearchSources
@@ -167,12 +172,9 @@ private fun MessageBody(
     // 只有助手回复会带思考标签，用户消息不必解析。
     // remember 以内容为键：流式输出时每个增量都会重组，
     // 每次重跑正则在长回复上是可观的开销
-    val parsed = remember(message.content, fromUser) {
-        if (fromUser) null else parseThinking(message.content)
-    }
-    // 搜索协议标签: 展示为独立搜索块, 正文里剥掉
-    val searchQuery = remember(message.content, fromUser) {
-        if (fromUser) null else parseSearchQuery(message.content)
+    // 顺序化拆分: 一条回复里思考/搜索/正文可能交替出现多段
+    val contentBlocks = remember(message.content, fromUser) {
+        if (fromUser) emptyList() else parseContentBlocks(message.content)
     }
     // 搜索来源列表: 默认收起, 展开显示本次实际用到的页面
     val searchSources = remember(message.content, fromUser) {
@@ -193,7 +195,7 @@ private fun MessageBody(
         } else {
             MarkdownText(
                 // 用剥掉标签后的正文，否则 <think> 会原样显示
-                text = stripSearchSources(stripSearchTag(parsed?.answer ?: message.content)),
+                text = answerText,
                 color = if (style == BubbleStyle.BUBBLE) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
@@ -214,24 +216,24 @@ private fun MessageBody(
         onLongClick = onLongPress
     )
 
-    // 思考块在气泡之外单独成栏：它与正式回答是并列关系，
-    // 塞进同一个气泡里会让两种内容混为一体
-    if (parsed?.hasReasoning == true) {
-        ReasoningBlock(
-            reasoning = parsed.reasoning ?: "",
-            thinking = parsed.thinking,
-            bubbleStyle = style,
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
-    }
-
-    // 搜索块: 与思考块同级的独立栏, 展示这次回复实际用了什么查询
-    if (searchQuery != null) {
-        SearchBlock(
-            query = searchQuery,
-            sources = searchSources,
-            onLinkClick = onLinkClick
-        )
+    // 思考/搜索块按出现顺序独立成栏, 与正式回答是并列关系。
+    // 两次思考+一次搜索 = 三个条, 段落先后与模型实际行为一致
+    contentBlocks.forEach { block ->
+        when (block) {
+            is ContentBlock.Think -> ReasoningBlock(
+                reasoning = block.text,
+                thinking = block.ongoing,
+                bubbleStyle = style,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            is ContentBlock.Search -> SearchBlock(
+                query = block.query,
+                sources = searchSources,
+                onLinkClick = onLinkClick,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            is ContentBlock.Answer -> {}
+        }
     }
 
     // 思考进行中而正文尚未开始时不渲染气泡，否则会出现一个空容器。
@@ -239,7 +241,13 @@ private fun MessageBody(
     //
     // 等待首 token 时（无思考、正文仍为空）同样不渲染：等 AI 开口
     // 之前界面上不该有任何占位框，进度由输入栏的阶段文字说明
-    val answerText = stripSearchSources(stripSearchTag(parsed?.answer ?: message.content))
+    val answerText = remember(message.content, fromUser) {
+        if (fromUser) message.content
+        else parseContentBlocks(message.content)
+            .filterIsInstance<ContentBlock.Answer>()
+            .joinToString("\n\n") { it.text }
+            .trim()
+    }
     if (message.isSending && answerText.isBlank() && !fromUser) {
         return
     }
@@ -401,44 +409,52 @@ private fun SearchBlock(
 ) {
     // 默认收起: 来源是佐证信息, 大多数时候不需要展开
     var expanded by remember { mutableStateOf(false) }
+    // 容器与思考块(ReasoningBlock)同一套底色与圆角, 两类附属信息视觉同族
     Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = AppShapeTokens.SettingsGroup,
         modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    // clip 在 clickable 之前: 涟漪跟随圆角
+                    .clip(AppShapeTokens.SettingsGroup)
                     .clickable { expanded = !expanded }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.size(8.dp))
                 Text(
-                    text = "已联网搜索：$query",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    text = "已联网搜索",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.size(6.dp))
+                Text(
+                    text = query,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                Spacer(Modifier.weight(1f))
                 Icon(
-                    imageVector = Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(18.dp)
+                    imageVector = if (expanded) {
+                        Icons.Filled.KeyboardArrowUp
+                    } else {
+                        Icons.Filled.KeyboardArrowDown
+                    },
+                    contentDescription = if (expanded) "收起" else "展开",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
             }
-            // 展开的来源列表: 每行一个页面, 点击进内置浏览器
-            if (expanded && sources.isNotEmpty()) {
-                Column(modifier = Modifier.padding(start = 36.dp, end = 12.dp, bottom = 10.dp)) {
+            // 来源列表: 每行一个页面, 点击进内置浏览器。AnimatedVisibility
+            // 与思考块的展开动画保持一致
+            AnimatedVisibility(visible = expanded && sources.isNotEmpty()) {
+                Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
                     sources.forEach { (title, url) ->
                         Text(
                             text = title,
@@ -449,7 +465,7 @@ private fun SearchBlock(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onLinkClick?.invoke(url) }
-                                .padding(vertical = 3.dp)
+                                .padding(vertical = 4.dp)
                         )
                     }
                 }
