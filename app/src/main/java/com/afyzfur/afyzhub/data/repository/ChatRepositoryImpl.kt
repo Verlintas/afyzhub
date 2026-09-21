@@ -15,9 +15,6 @@ import com.afyzfur.afyzhub.data.settings.AppSettings
 import com.afyzfur.afyzhub.data.settings.SettingsProvider
 import com.afyzfur.afyzhub.domain.model.AiProvider
 import com.afyzfur.afyzhub.domain.model.Conversation
-
-private const val LT = "<"
-private const val GT = ">"
 import com.afyzfur.afyzhub.domain.model.ConversationItem
 import com.afyzfur.afyzhub.domain.model.Message
 import com.afyzfur.afyzhub.domain.model.SendPhase
@@ -27,6 +24,9 @@ import kotlinx.coroutines.withContext
 import com.afyzfur.afyzhub.util.Constants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+
+private const val LT = "<"
+private const val GT = ">"
 
 /** 搜索来源块: 记录本次回复实际用到的搜索结果, UI 渲染为可展开列表 */
 private const val SEARCH_SOURCES_OPEN = LT + "sources" + GT
