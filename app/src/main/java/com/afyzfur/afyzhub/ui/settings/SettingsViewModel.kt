@@ -92,6 +92,8 @@ class SettingsViewModel(
             _selectedModel.value = settings.model
             _baseUrl.value = settings.baseUrl
             _streamEnabled.value = settings.streamEnabled
+            _geminiSearchEnabled.value = settings.geminiSearchEnabled
+            _webSearchEnabled.value = settings.webSearchEnabled
             // 直接展示上次拉取的结果，避免每次进入设置页都要重新获取。
             _availableModels.value = settingsRepository.cachedModels(settings.provider)
             initialized = true

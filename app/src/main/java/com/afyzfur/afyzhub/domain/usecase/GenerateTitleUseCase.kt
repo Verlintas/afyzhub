@@ -4,6 +4,7 @@ import com.afyzfur.afyzhub.data.remote.provider.ChatClientRegistry
 import com.afyzfur.afyzhub.data.remote.provider.ChatTurn
 import com.afyzfur.afyzhub.data.settings.SettingsProvider
 import com.afyzfur.afyzhub.domain.model.parseThinking
+import com.afyzfur.afyzhub.domain.model.stripSearchSources
 
 /**
  * 用模型生成会话标题与一句话总结。
@@ -62,7 +63,10 @@ class GenerateTitleUseCase(
             if (settings.apiKey.isBlank()) return null
 
             // 助手回复可能含思考过程，只取正式回答部分去总结
-            val answer = parseThinking(assistantReply).answer.ifBlank { assistantReply }
+            // 思考与搜索来源块都从总结输入中剥离: 来源是 "标题 :: url"
+            // 行的机器可读格式, 混进总结会让摘要变成一串链接列表
+            val answer = stripSearchSources(parseThinking(assistantReply).answer)
+                .ifBlank { assistantReply }
 
             val result = clientRegistry.clientFor(settings.provider).complete(
                 turns = listOf(

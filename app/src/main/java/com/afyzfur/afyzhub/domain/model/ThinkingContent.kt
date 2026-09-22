@@ -161,7 +161,25 @@ fun parseContentBlocks(content: String): List<ContentBlock> {
     for (m in CLOSED_THINK.findAll(content)) {
         markers.add(Marker(m.range.first, m.range.last + 1, ContentBlock.Think(m.groupValues[2].trim(), false)))
     }
-    // 流式进行中的未闭合思考: 开标签之后到字符串末尾
+    // 流式进行中的末尾未闭合思考: 最后一个已闭合块之后若还有开标签,
+    // 该开标签到字符串末尾是进行中的思考(搜索二轮流式常见)。
+    // 在 markers 非空时也要检测, 否则未闭合段会落进正文
+    if (markers.isNotEmpty()) {
+        val lastClosedEnd = CLOSED_THINK.findAll(content)
+            .lastOrNull()?.range?.last?.plus(1) ?: 0
+        val tail = content.substring(lastClosedEnd)
+        val tailOpen = OPEN_THINK.find(tail)
+        if (tailOpen != null) {
+            val text = tailOpen.groupValues[1].trim()
+            if (text.isNotEmpty()) {
+                markers.add(Marker(
+                    lastClosedEnd + tailOpen.range.first,
+                    content.length,
+                    ContentBlock.Think(text, true)
+                ))
+            }
+        }
+    }
     if (markers.isEmpty()) {
         val open = OPEN_THINK.find(content)
         if (open != null) {
