@@ -1,6 +1,7 @@
 package com.afyzfur.afyzhub.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import coil.compose.AsyncImage
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -407,9 +408,9 @@ private fun SearchBlock(
     modifier: Modifier = Modifier,
     onLinkClick: ((String) -> Unit)? = null
 ) {
-    // 默认收起: 来源是佐证信息, 大多数时候不需要展开
+    // DeepSeek 风格: 收起一行(favicon+标题+查询词), 展开为来源列表。
+    // 每条来源 = favicon + 标题, 点整行进内置浏览器; 不显示摘要
     var expanded by remember { mutableStateOf(false) }
-    // 容器与思考块(ReasoningBlock)同一套底色与圆角, 两类附属信息视觉同族
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = AppShapeTokens.SettingsGroup,
@@ -420,11 +421,17 @@ private fun SearchBlock(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    // clip 在 clickable 之前: 涟漪跟随圆角
                     .clip(AppShapeTokens.SettingsGroup)
                     .clickable { expanded = !expanded }
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
+                // 查询词对应的 favicon: 用搜索引擎首页图标兜底
+                AsyncImage(
+                    model = "https://www.google.com/s2/favicons?domain=bing.com&sz=32",
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.size(10.dp))
                 Text(
                     text = "已联网搜索",
                     style = MaterialTheme.typography.labelLarge,
@@ -451,22 +458,36 @@ private fun SearchBlock(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            // 来源列表: 每行一个页面, 点击进内置浏览器。AnimatedVisibility
-            // 与思考块的展开动画保持一致
+            // 来源列表: favicon + 标题, 点整行进内置浏览器
             AnimatedVisibility(visible = expanded && sources.isNotEmpty()) {
                 Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
                     sources.forEach { (title, url) ->
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.small)
                                 .clickable { onLinkClick?.invoke(url) }
-                                .padding(vertical = 4.dp)
-                        )
+                                .padding(vertical = 5.dp)
+                        ) {
+                            // 该站点的 favicon, 加载失败时不显示
+                            AsyncImage(
+                                model = "https://www.google.com/s2/favicons?domain=" +
+                                    url.removePrefix("https://").removePrefix("http://")
+                                        .substringBefore('/') + "&sz=32",
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.size(10.dp))
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }

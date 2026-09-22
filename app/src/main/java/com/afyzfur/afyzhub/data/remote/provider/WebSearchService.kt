@@ -42,7 +42,9 @@ class WebSearchService(
     data class Result(
         val title: String,
         val snippet: String,
-        val url: String
+        val url: String,
+        /** 来源站点域名，如 "zhihu.com"，用于 favicon 与署名 */
+        val site: String = ""
     )
 
     /**
@@ -78,17 +80,19 @@ class WebSearchService(
         return emptyList()
     }
     private suspend fun searchBing(query: String, maxResults: Int): List<Result> {
-        val html = transport.getForText(
+        // RSS 输出而非 HTML：结构稳定多年、无广告与 SEO 垃圾，
+        // 每条 item 固定为 title/link/description 三件套
+        val xml = transport.getForText(
             baseUrl = "https://www.bing.com",
             path = "/search",
             headers = mapOf(
-                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36",
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36",
                 "Accept-Language" to "zh-CN,zh;q=0.9"
             ),
-            query = mapOf("q" to query, "setmkt" to "zh-CN"),
-            logContext = RequestLogContext(provider = "web-search", model = "bing")
+            query = mapOf("q" to query, "format" to "rss", "count" to maxResults.toString()),
+            logContext = RequestLogContext(provider = "web-search", model = "bing-rss")
         )
-        return parseBing(html, maxResults)
+        return parseBingRss(xml, maxResults)
     }
     private suspend fun searchBaidu(query: String, maxResults: Int): List<Result> {
         val html = transport.getForText(
@@ -140,7 +144,8 @@ class WebSearchService(
                 Result(
                     title = stripTags(m.groupValues[2]),
                     snippet = "",
-                    url = cleanUrl(m.groupValues[1])
+                    url = cleanUrl(m.groupValues[1]),
+                    site = siteOf(cleanUrl(m.groupValues[1]))
                 )
             }
             .toList()
@@ -171,7 +176,7 @@ class WebSearchService(
             val url = m.groupValues[1]
             if (url.startsWith("http") || url.startsWith("/link")) {
                 val full = if (url.startsWith("/")) "https://www.baidu.com" + url else url
-                out += Result(stripTags(m.groupValues[2]), "", full)
+                out += Result(stripTags(m.groupValues[2]), "", full, siteOf(full))
                 if (out.size >= maxResults) break
             }
         }
@@ -194,7 +199,7 @@ class WebSearchService(
                 .map { it.groupValues[1] }
                 .firstOrNull { !it.contains("google.") && !it.contains("gstatic.") }
                 ?: continue
-            out += Result(stripTags(title), "", url)
+            out += Result(stripTags(title), "", url, siteOf(url))
             if (out.size >= maxResults) break
         }
         return out
@@ -207,6 +212,38 @@ class WebSearchService(
      * 摘要在第一个 p 标签。按块切分加通用标签匹配,
      * 对页面局部结构调整不敏感。
      */
+    /**
+     * 解析 Bing RSS 输出。
+     *
+     * 每条结果是一个 `<item>` 块：title / link / description 各一，
+     * 结构由 Bing 官方保证，不受页面改版或广告投放影响。
+     */
+    private fun parseBingRss(xml: String, maxResults: Int): List<Result> {
+        val items = xml.split("<item>").drop(1)
+        val out = mutableListOf<Result>()
+        for (item in items) {
+            val title = Regex("<title>(.*?)</title>", RegexOption.DOT_MATCHES_ALL)
+                .find(item)?.groupValues?.get(1) ?: continue
+            val link = Regex("<link>(.*?)</link>", RegexOption.DOT_MATCHES_ALL)
+                .find(item)?.groupValues?.get(1) ?: continue
+            val desc = Regex("<description>(.*?)</description>", RegexOption.DOT_MATCHES_ALL)
+                .find(item)?.groupValues?.get(1) ?: ""
+            val url = stripTags(link)
+            out += Result(
+                title = stripTags(title),
+                snippet = stripTags(desc),
+                url = url,
+                site = siteOf(url)
+            )
+            if (out.size >= maxResults) break
+        }
+        return out
+    }
+
+    /** 从 url 提取站点域名（去 www.），favicon 与署名用 */
+    private fun siteOf(url: String): String =
+        Regex("https?://(?:www\\.)?([^/]+)").find(url)?.groupValues?.get(1) ?: ""
+
     private fun parseBing(html: String, maxResults: Int): List<Result> {
         val blocks = html.split("<li class=\"b_algo\"").drop(1)
         val out = mutableListOf<Result>()
@@ -217,7 +254,7 @@ class WebSearchService(
                 .find(b)?.groupValues?.get(1) ?: continue
             val snippet = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL)
                 .find(b)?.groupValues?.get(1) ?: ""
-            out += Result(stripTags(title), stripTags(snippet), url)
+            out += Result(stripTags(title), stripTags(snippet), url, siteOf(url))
             if (out.size >= maxResults) break
         }
         return out
