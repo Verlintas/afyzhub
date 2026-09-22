@@ -96,7 +96,7 @@ private val OPEN_THINK = Regex(
  * UI 用它提取搜索词展示搜索块, 并从正文剥除标签。
  */
 private val SEARCH_TAG = Regex(
-    """<search>(.*?)</search>""",
+    """<web_search>(.*?)</web_search>""",
     RegexOption.DOT_MATCHES_ALL
 )
 

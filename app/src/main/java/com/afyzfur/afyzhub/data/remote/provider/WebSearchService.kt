@@ -293,17 +293,17 @@ class WebSearchService(
          */
         fun instruction(): String = """
             |你可以使用网络搜索。当且仅当回答需要你无法确定的实时或具体信息时，
-            |先输出一行 <search>搜索词</search>（标签内是你会输入搜索引擎的关键词，
-            |例如 <search>2025 诺贝尔物理学奖</search>），然后立即停止输出，不要输出其他任何内容。
+            |先输出一行 <web_search>关键词</web_search>（标签内是你会输入搜索引擎的关键词，
+            |例如 <web_search>2025 中秋</web_search>），然后立即停止输出，不要输出其他任何内容。
             |系统检测到该标签后会执行搜索并把结果提供给你，你再基于结果继续回答。
             |如果已有足够信息回答，直接回答，不要输出该标签。
         """.trimMargin()
 
         /** 从模型输出中提取搜索查询词 */
         fun extractQuery(reply: String): String? {
-            val m = Regex("""<search>(.*?)</search>""", RegexOption.DOT_MATCHES_ALL)
+            val m = Regex("""<web_search>(.*?)</web_search>""", RegexOption.DOT_MATCHES_ALL)
                 .find(reply)
-                ?: Regex("""<search>(.*)""", RegexOption.DOT_MATCHES_ALL)
+                ?: Regex("""<web_search>(.*)""", RegexOption.DOT_MATCHES_ALL)
                     .find(reply)
             return m?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
         }
