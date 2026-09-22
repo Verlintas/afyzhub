@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://www.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.20-purple.svg)](https://kotlinlang.org)
-[![Release](https://img.shields.io/badge/version-v0.3.5--dev-orange.svg)](https://github.com/afyzfur/afyzhub/releases)
+[![Release](https://img.shields.io/badge/version-v0.3.7--dev-orange.svg)](https://github.com/afyzfur/afyzhub/releases)
 
 [下载 APK](https://github.com/afyzfur/afyzhub/releases) · [更新日志](CHANGELOG.md)
 
@@ -69,6 +69,20 @@ API Key 仅存储在本机，不经过任何第三方服务。
 | 网络 | OkHttp（含 SSE 流式） |
 | 存储 | Room, DataStore |
 | 序列化 | Kotlin Serialization |
+
+## 支持开发
+
+AfyzHub 是完全免费开源的项目。如果它对你有帮助，欢迎通过爱发电赞助开发者，助力项目持续更新：
+
+<div align="center">
+
+[**⚡ 前往爱发电赞助**](https://afdian.com/a/afyzhub)
+
+[![afdian](https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme-hi.png)](https://afdian.com/a/afyzhub)
+
+</div>
+
+> 你的每一份支持都会变成更快的更新节奏和更多的功能。
 
 ## 本地构建
 
