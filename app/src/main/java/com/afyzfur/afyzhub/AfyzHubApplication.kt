@@ -4,6 +4,8 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.SvgDecoder
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
 import com.afyzfur.afyzhub.data.log.RequestLogStore
 import com.afyzfur.afyzhub.data.settings.SettingsRepository
 import com.afyzfur.afyzhub.di.appModule
@@ -55,8 +57,21 @@ class AfyzHubApplication : Application(), ImageLoaderFactory {
         }
     }
 
+    /**
+     * Coil 图片加载器。
+     *
+     * 除 SVG 解码器外，还收紧网络策略：搜索结果里的站点图标是
+     * 三方小图，源站不可达时不该让请求长时间挂着——超时后由
+     * 调用方的占位逻辑兜住，比转圈十几秒体感好得多。
+     */
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .components { add(SvgDecoder.Factory()) }
+            .okHttpClient {
+                OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS)
+                    .build()
+            }
             .build()
 }

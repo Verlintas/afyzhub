@@ -1,7 +1,7 @@
 package com.afyzfur.afyzhub.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -401,6 +403,58 @@ private fun FailedMessage(
  * 不是正文的一部分。样式刻意做得低调: 一行图标加文字,
  * 不与气泡争夺注意力
  */
+/** 由页面 url 取站点 favicon 地址。直连站点自身最可靠： */
+private fun faviconUrl(url: String): String {
+    val host = url.removePrefix("https://").removePrefix("http://")
+        .substringBefore('/')
+    return if (host.isBlank()) "" else "https://$host/favicon.ico"
+}
+
+/**
+ * 站点图标。三级降级：站点 favicon -> 首字母圆形占位。
+ *
+ * 不用 Google 的 favicon 服务：该域名在部分网络下不可达，
+ * 请求超时后只剩空白。直连站点自身兼容性最好，失败时用
+ * 首字母占位保证始终有可辨识的视觉锚点。
+ */
+@Composable
+private fun SiteIcon(url: String, size: Dp) {
+    val host = url.removePrefix("https://").removePrefix("http://")
+        .substringBefore('/')
+    val letter = host.removePrefix("www.").firstOrNull()?.uppercase() ?: "·"
+    SubcomposeAsyncImage(
+        model = faviconUrl(url),
+        contentDescription = null,
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape),
+        loading = {
+            // 加载中给同尺寸的浅色圆点占位，避免行高跳动
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            )
+        },
+        error = {
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = letter,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    )
+}
+
 @Composable
 private fun SearchBlock(
     query: String,
@@ -425,12 +479,8 @@ private fun SearchBlock(
                     .clickable { expanded = !expanded }
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                // 查询词对应的 favicon: 用搜索引擎首页图标兜底
-                AsyncImage(
-                    model = "https://www.google.com/s2/favicons?domain=bing.com&sz=32",
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                // 搜索块图标: 固定用 Bing 图标(当前默认引擎)
+                SiteIcon(url = "https://www.bing.com", size = 16.dp)
                 Spacer(Modifier.size(10.dp))
                 Text(
                     text = "已联网搜索",
@@ -470,14 +520,8 @@ private fun SearchBlock(
                                 .clickable { onLinkClick?.invoke(url) }
                                 .padding(vertical = 5.dp)
                         ) {
-                            // 该站点的 favicon, 加载失败时不显示
-                            AsyncImage(
-                                model = "https://www.google.com/s2/favicons?domain=" +
-                                    url.removePrefix("https://").removePrefix("http://")
-                                        .substringBefore('/') + "&sz=32",
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            // 站点图标: 直连 favicon, 失败退首字母
+                            SiteIcon(url = url, size = 16.dp)
                             Spacer(Modifier.size(10.dp))
                             Text(
                                 text = title,
