@@ -473,18 +473,18 @@ private fun ChatContent(
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth(),
-                        .pointerInput(Unit) {
-                            // 按下即标记, 拖不拖都算 —— 抬起前流式增量不抢滚动
-                            awaitEachGesture {
-                                awaitFirstDown(requireUnconsumed = false)
-                                pointerPressed = true
-                                while (awaitPointerEvent().changes.any { it.pressed }) {
-                                    // 持续按住
+                            .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                // 按下即标记, 拖不拖都算 —— 抬起前流式增量不抢滚动
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    pointerPressed = true
+                                    while (awaitPointerEvent().changes.any { it.pressed }) {
+                                        // 持续按住, 空转等待抬起
+                                    }
+                                    pointerPressed = false
                                 }
-                                pointerPressed = false
-                            }
-                        }
+                            },
                         state = listState,
                         contentPadding = PaddingValues(
                             start = 16.dp,
