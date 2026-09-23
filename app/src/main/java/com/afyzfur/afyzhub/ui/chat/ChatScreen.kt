@@ -497,7 +497,7 @@ private fun ChatContent(
                             .fillMaxWidth()
                             .pointerInput(Unit) {
                                 // 按下暂停抢滚; 累计上滑超过阈值视为主动离开底部,
-                                // 抬起时已在底部才解除暂停 —— 滑回底部恢复跟随
+                                // 上滑超阈值即锁死跟随; 解锁唯一途径: 滑回最底部(settle 结算处)
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false)
                                     lastTouchAt.value = System.currentTimeMillis()
@@ -509,8 +509,7 @@ private fun ChatContent(
                                         val delta = ev.changes.sumOf { it.positionChange().y.toDouble() }.toFloat()
                                         lastTouchAt.value = System.currentTimeMillis()
                                         travel += delta
-                                        if (travel < -48f) followPaused.value = true
-                                        if (travel > 48f) followPaused.value = false
+                                        if (travel < -24f) followPaused.value = true
                                         if (!pressed) break
                                     }
                                     lastTouchAt.value = System.currentTimeMillis()
