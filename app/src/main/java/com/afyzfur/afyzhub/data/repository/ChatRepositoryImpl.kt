@@ -194,7 +194,11 @@ class ChatRepositoryImpl(
                     client.complete(searchedTurns, settings)
                 }
                 searchUsage = secondOutcome.usage ?: searchUsage
-                reply = secondOutcome.content + sourcesBlock
+                // 模型有时复读上下文里的搜索/来源标签: 复读的闭合 sources 会把
+                // 整段正文当来源剥掉(表现为回答输出完突然消失)。这里在拼接
+                // 官方 sources 块之前先清掉模型自己输出的这类标签
+                val cleanedSecond = WebSearchService.stripModelEchoTags(secondOutcome.content)
+                reply = cleanedSecond + sourcesBlock
                 if (secondOutcome.content.isBlank()) {
                     throw IllegalStateException("模型返回内容为空")
                 }

@@ -128,10 +128,27 @@ fun parseSearchSources(content: String): List<Pair<String, String>> {
 /** 剥除正文中的来源块 */
 fun stripSearchSources(content: String): String =
     SOURCES_TAG.replace(content, "").trim()
+/**
+ * 清理模型输出的复读标签。
+ *
+ * 二轮请求的上下文里带有搜索与来源标签, 模型有时照着样子在自己的输出里
+ * 也包一层, 闭合的 sources 会把整段正文当来源剥掉, 正文随之消失。
+ * 这里剥除模型输出里复读的标签(保留 sources 内的正文文本),
+ * 官方来源块由发送流程统一追加, 不依赖模型自己输出。
+ */
+fun stripModelEchoTags(content: String): String {
+    var out = SEARCH_TAG.replace(content, "")
+    // 已闭合的上面剥掉了, 剩下的是未闭合截断态: 从开标签吃到末尾
+    out = Regex(""""<web_search>.*"""", RegexOption.DOT_MATCHES_ALL).replace(out, "")
+    // sources 只剥标签对本身, 内部文本(往往是正文)保留
+    out = out.replace("<sources>", "").replace("</sources>", "")
+    return out.trim()
+}
+
 
 /** 剥除正文中的搜索标签, 未闭合的开标签一并清掉 */
 fun stripSearchTag(content: String): String = SEARCH_TAG.replace(content, "")
-    .replace(Regex("""<search>.*""", RegexOption.DOT_MATCHES_ALL), "")
+    .replace(Regex("""<(?:web_search|search)>.*""", RegexOption.DOT_MATCHES_ALL), "")
     .trim()
 
 

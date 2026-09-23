@@ -292,21 +292,24 @@ class WebSearchService(
          * - 要求查询词精炼——它就是搜索框里的输入
          */
         fun instruction(): String = """
-            |你可以使用网络搜索。当且仅当回答需要你无法确定的实时或具体信息时，
-            |先输出一行搜索请求再停止：标签写法是「<web_search>要搜的词</web_search>」，
-            |其中「要搜的词」必须替换成你真实要查的内容，绝不能照抄字面，
-            |比如想查中秋节就输出 <web_search>2025中秋节是几月几号</web_search>，
-            |输出该行后立即停止，等待系统提供搜索结果，你再继续回答。
-            |如果已有足够信息回答，直接回答，不要输出该行。
+            |你可以在需要实时或最新信息时使用网络搜索。使用方法：
+            |只输出一行搜索请求，用标签包住完整的搜索词，随后立即停止输出，
+            |例如： <web_search>2025中秋节是几月几号</web_search>
+            |或： <web_search>OpenAI最新模型发布时间</web_search>
+            |标签内必须是你真实想搜索的内容，绝不能照抄示例或输出占位词。
+            |系统会执行搜索并把结果提供给你，你基于结果继续回答。
+            |如果无需搜索或已有足够信息，直接回答，不要输出任何标签。
         """.trimMargin()
-
         /** 从模型输出中提取搜索查询词 */
         fun extractQuery(reply: String): String? {
             val m = Regex("""<web_search>(.*?)</web_search>""", RegexOption.DOT_MATCHES_ALL)
                 .find(reply)
                 ?: Regex("""<web_search>(.*)""", RegexOption.DOT_MATCHES_ALL)
                     .find(reply)
-            return m?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
+            val q = m?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() } ?: return null
+            // 模型偶尔复读指令占位词而非给出真实查询: 视为无效, 不触发搜索
+            val placeholders = setOf("关键词", "要搜的词", "搜索词", "搜索关键词", "query", "search", "2025中秋节是几月几号", "openai最新模型发布时间")
+            return if (q.lowercase() in placeholders) null else q
         }
 
         /** 把搜索结果格式化为注入上下文的文本 */
@@ -317,6 +320,23 @@ class WebSearchService(
             return results.joinToString("\n\n") { r ->
                 "${r.title}\n${r.snippet}\n来源: ${r.url}"
             }
+        }
+
+        /**
+         * 清理模型输出的复读标签。
+         *
+         * 二轮请求的上下文里带有搜索与来源标签, 模型有时照样子在自己的输出里
+         * 也包一层。复读的闭合 sources 会把整段正文当来源剥掉(正文消失),
+         * 复读的 web_search 会在正文里多出搜索块。这里剥掉标签对本身,
+         * sources 内的文本(往往是正文)保留, 官方来源块由发送流程统一追加。
+         */
+        fun stripModelEchoTags(content: String): String {
+            var out = Regex("""<web_search>(.*?)</web_search>""", RegexOption.DOT_MATCHES_ALL).replace(content, "")
+            // 未闭合的截断态: 从开标签吃到末尾
+            out = Regex("""<web_search>.*""", RegexOption.DOT_MATCHES_ALL).replace(out, "")
+            // sources 只剥标签对本身, 内部文本保留
+            out = out.replace("<sources>", "").replace("</sources>", "")
+            return out.trim()
         }
     }
 }

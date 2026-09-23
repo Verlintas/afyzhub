@@ -129,6 +129,9 @@ fun ChatScreen(
     var autoScroll by remember(currentConversationId) { mutableStateOf(true) }
     // 手指按下列表任意位置(含未拖动)即暂停抢滚, 抬起恢复 —— 消除按下未过slop窗口被拽回的竞态
     val pressedState = remember { mutableStateOf(false) }
+    // 上滑意图: 一旦用户向上拖过阈值即暂停跟随, 滑回底部才恢复 ——
+    // 解决松手后 atBottom 误判为 true 导致的自动回底
+    val followPaused = remember { mutableStateOf(false) }
 
     // 视口是否停在（或接近）列表底部。128px 容差："差一点到底"也认作
     // 到底，否则恢复条件苛刻到手松开后仍差 1px 而不生效
@@ -154,7 +157,8 @@ fun ChatScreen(
                     // (含容差)即恢复。若在所有非滚动帧都结算, 流式
                     // 内容增长的瞬间 atBottom 会先变 false(布局先
                     // 变、贴底滚动后到), 会把正常跟随误杀
-                    autoScroll = atBottom
+                        autoScroll = atBottom
+                        if (atBottom) followPaused.value = false
                 }
                 wasScrolling = scrolling
             }
@@ -169,12 +173,12 @@ fun ChatScreen(
         // 手势/甩动进行中不发起程序滚动：滚动互斥锁被手势持有,
         // scrollToItem 会挂起排队, 手一松就补执行, 视口被拽回底部
         // ——松手后的位置结算会按 atBottom 决定是否恢复, 不会漏
-        if (autoScroll && !listState.isScrollInProgress && !pressedState.value) {
+        if (autoScroll && !listState.isScrollInProgress && !pressedState.value && !followPaused.value) {
             // 流式增量高频触发本 effect, 重启会取消上一次排队的滚动;
             // delay+复查把 "检查时未按下、发起时已按下"的竞态窗口压到最小,
             // 否则排队中的 scrollToItem 会在用户松手后执行, 把视口拽回底部
             delay(64)
-            if (autoScroll && !listState.isScrollInProgress && !pressedState.value) {
+            if (autoScroll && !listState.isScrollInProgress && !pressedState.value && !followPaused.value) {
                 // 索引等于消息数: 列表末尾的 bottom-anchor, 详 LazyColumn 内注释
                 listState.scrollToItem(messages.size)
             }
@@ -246,6 +250,8 @@ fun ChatScreen(
             error = error,
             listState = listState,
             pressedState = pressedState,
+            followPaused = followPaused,
+            onStopFollow = { autoScroll = false },
             inputText = inputText,
             onInputChange = { inputText = it },
             onOpenDrawer = { scope.launch { drawerState.open() } },
@@ -371,6 +377,8 @@ private fun ChatContent(
     error: String?,
     listState: LazyListState,
     pressedState: androidx.compose.runtime.MutableState<Boolean>,
+    followPaused: androidx.compose.runtime.MutableState<Boolean>,
+    onStopFollow: () -> Unit,
     inputText: String,
     onInputChange: (String) -> Unit,
     onOpenDrawer: () -> Unit,
@@ -484,12 +492,20 @@ private fun ChatContent(
                             .weight(1f)
                             .fillMaxWidth()
                             .pointerInput(Unit) {
-                                // 按下即标记, 拖不拖都算 —— 抬起前流式增量不抢滚动
+                                // 按下暂停抢滚; 累计上滑超过阈值视为主动离开底部,
+                                // 抬起时已在底部才解除暂停 —— 滑回底部恢复跟随
                                 awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false)
+                                    val down = awaitFirstDown(requireUnconsumed = false)
                                     pressedState.value = true
-                                    while (awaitPointerEvent().changes.any { it.pressed }) {
-                                        // 持续按住, 空转等待抬起
+                                    var travel = 0f
+                                    while (true) {
+                                        val ev = awaitPointerEvent()
+                                        val pressed = ev.changes.any { it.pressed }
+                                        val delta = ev.changes.sumOf { it.positionChange().y.toDouble() }.toFloat()
+                                        travel += delta
+                                        if (travel < -48f) followPaused.value = true
+                                        if (travel > 48f) followPaused.value = false
+                                        if (!pressed) break
                                     }
                                     pressedState.value = false
                                 }
