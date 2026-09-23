@@ -509,8 +509,16 @@ private fun SearchBlock(
                 )
             }
             // 来源列表: favicon + 标题, 点整行进内置浏览器
-            AnimatedVisibility(visible = expanded && sources.isNotEmpty()) {
+            AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
+                    if (sources.isEmpty()) {
+                        // streaming: sources not yet persisted
+                        Text(
+                            text = "正在获取搜索结果…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     sources.forEach { (title, url) ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

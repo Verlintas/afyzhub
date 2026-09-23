@@ -6,6 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.clickable
@@ -123,6 +126,8 @@ fun ChatScreen(
      * - 手势结束（settle）时按最终位置结算：停在底部就恢复跟随
      */
     var autoScroll by remember(currentConversationId) { mutableStateOf(true) }
+    // 手指按下列表任意位置(含未拖动)即暂停抢滚, 抬起恢复 —— 消除按下未过slop窗口被拽回的竞态
+    var pointerPressed by remember(currentConversationId) { mutableStateOf(false) }
 
     // 视口是否停在（或接近）列表底部。128px 容差："差一点到底"也认作
     // 到底，否则恢复条件苛刻到手松开后仍差 1px 而不生效
@@ -163,7 +168,7 @@ fun ChatScreen(
         // 手势/甩动进行中不发起程序滚动：滚动互斥锁被手势持有,
         // scrollToItem 会挂起排队, 手一松就补执行, 视口被拽回底部
         // ——松手后的位置结算会按 atBottom 决定是否恢复, 不会漏
-        if (autoScroll && !listState.isScrollInProgress) {
+        if (autoScroll && !listState.isScrollInProgress && !pointerPressed) {
             // 索引等于消息数: 列表末尾的 bottom-anchor, 详 LazyColumn 内注释
             listState.scrollToItem(messages.size)
         }
@@ -469,6 +474,17 @@ private fun ChatContent(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
+                        .pointerInput(Unit) {
+                            // 按下即标记, 拖不拖都算 —— 抬起前流式增量不抢滚动
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                pointerPressed = true
+                                while (awaitPointerEvent().changes.any { it.pressed }) {
+                                    // 持续按住
+                                }
+                                pointerPressed = false
+                            }
+                        }
                         state = listState,
                         contentPadding = PaddingValues(
                             start = 16.dp,

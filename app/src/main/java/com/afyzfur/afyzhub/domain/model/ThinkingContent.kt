@@ -157,6 +157,7 @@ fun parseContentBlocks(content: String): List<ContentBlock> {
     data class Marker(val start: Int, val end: Int, val block: ContentBlock?)
 
     val markers = mutableListOf<Marker>()
+    val seenQueries = mutableSetOf<String>()
 
     for (m in CLOSED_THINK.findAll(content)) {
         markers.add(Marker(m.range.first, m.range.last + 1, ContentBlock.Think(m.groupValues[2].trim(), false)))
@@ -188,16 +189,19 @@ fun parseContentBlocks(content: String): List<ContentBlock> {
     }
     for (m in SEARCH_TAG.findAll(content)) {
         val q = m.groupValues[1].trim()
-        if (q.isNotEmpty()) markers.add(Marker(m.range.first, m.range.last + 1, ContentBlock.Search(q)))
+        if (q.isNotEmpty() && !seenQueries.contains(q)) {
+            seenQueries.add(q)
+            markers.add(Marker(m.range.first, m.range.last + 1, ContentBlock.Search(q)))
+        }
     }
     // 搜索标签被截断的流式中间态: 只有开标签
     val openSearch = Regex(
-        """<search>.*""",
+        """<web_search>.*""",
         RegexOption.DOT_MATCHES_ALL
     )
     if (openSearch.findAll(content).count() > SEARCH_TAG.findAll(content).count()) {
         val m = openSearch.find(content)!!
-        val q = m.value.removePrefix("""<search>""").trim()
+        val q = m.value.replaceFirst("""<web_search>""", "").trim()
         if (q.isNotEmpty()) markers.add(Marker(m.range.first, content.length, ContentBlock.Search(q)))
     }
 
