@@ -387,7 +387,7 @@ class ChatRepositoryImpl(
         var usage: TokenUsage? = null
         var lastUpdateTime = 0L
         var receivedThisRound = false
-        val updateInterval = 50L // 50ms 更新一次，平衡流畅度和性能
+        val updateInterval = 120L // 120ms 节流: 更频繁的写库只会放大重组开销, 流式观感差别很小
 
         client.stream(turns, settings).collect { event ->
             when (event) {

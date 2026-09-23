@@ -176,18 +176,21 @@ private fun MessageBody(
     // remember 以内容为键：流式输出时每个增量都会重组，
     // 每次重跑正则在长回复上是可观的开销
     // 顺序化拆分: 一条回复里思考/搜索/正文可能交替出现多段
-    val contentBlocks = remember(message.content, fromUser) {
-        if (fromUser) emptyList() else parseContentBlocks(message.content)
+    // 单次解析派生全部视图数据: 旧实现 parseContentBlocks 跑了两遍 +
+    // parseSearchSources 一遍, 流式期间每 50ms 重组一次全是重复正则扫描
+    val parsed = remember(message.content, fromUser) {
+        if (fromUser) null else parseContentBlocks(message.content)
     }
-    val answerText = remember(message.content, fromUser) {
-        if (fromUser) message.content
-        else parseContentBlocks(message.content)
-            .filterIsInstance<ContentBlock.Answer>()
-            .joinToString("\n\n") { it.text }
-            .trim()
+    val contentBlocks = parsed ?: emptyList()
+    val answerText = remember(parsed, message.content, fromUser) {
+        when {
+            fromUser -> message.content
+            parsed == null -> ""
+            else -> parsed.filterIsInstance<ContentBlock.Answer>()
+                .joinToString("\n\n") { it.text }.trim()
+        }
     }
-    // 搜索来源列表: 默认收起, 展开显示本次实际用到的页面
-    val searchSources = remember(message.content, fromUser) {
+    val searchSources = remember(parsed, message.content, fromUser) {
         if (fromUser) emptyList() else parseSearchSources(message.content)
     }
 

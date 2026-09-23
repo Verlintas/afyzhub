@@ -100,6 +100,12 @@ private val SEARCH_TAG = Regex(
     RegexOption.DOT_MATCHES_ALL
 )
 
+/** 流式中间态: 只有开标签吃到末尾 */
+private val OPEN_SEARCH_ANY = Regex(
+    """<web_search>.*""",
+    RegexOption.DOT_MATCHES_ALL
+)
+
 /** 提取搜索词, 无标签或内容为空时返回 null */
 fun parseSearchQuery(content: String): String? =
     SEARCH_TAG.find(content)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
@@ -212,10 +218,7 @@ fun parseContentBlocks(content: String): List<ContentBlock> {
         }
     }
     // 搜索标签被截断的流式中间态: 只有开标签
-    val openSearch = Regex(
-        """<web_search>.*""",
-        RegexOption.DOT_MATCHES_ALL
-    )
+    val openSearch = OPEN_SEARCH_ANY
     if (openSearch.findAll(content).count() > SEARCH_TAG.findAll(content).count()) {
         val m = openSearch.find(content)!!
         val q = m.value.replaceFirst("""<web_search>""", "").trim()
