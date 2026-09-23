@@ -130,6 +130,7 @@ fun ChatScreen(
     var autoScroll by remember(currentConversationId) { mutableStateOf(true) }
     // 手指按下列表任意位置(含未拖动)即暂停抢滚, 抬起恢复 —— 消除按下未过slop窗口被拽回的竞态
     val pressedState = remember { mutableStateOf(false) }
+    val lastTouchAt = remember { mutableStateOf(0L) }
     // 上滑意图: 一旦用户向上拖过阈值即暂停跟随, 滑回底部才恢复 ——
     // 解决松手后 atBottom 误判为 true 导致的自动回底
     val followPaused = remember { mutableStateOf(false) }
@@ -174,12 +175,12 @@ fun ChatScreen(
         // 手势/甩动进行中不发起程序滚动：滚动互斥锁被手势持有,
         // scrollToItem 会挂起排队, 手一松就补执行, 视口被拽回底部
         // ——松手后的位置结算会按 atBottom 决定是否恢复, 不会漏
-        if (autoScroll && !listState.isScrollInProgress && !pressedState.value && !followPaused.value) {
+        if (autoScroll && System.currentTimeMillis() - lastTouchAt.value > 320) {
             // 流式增量高频触发本 effect, 重启会取消上一次排队的滚动;
             // delay+复查把 "检查时未按下、发起时已按下"的竞态窗口压到最小,
             // 否则排队中的 scrollToItem 会在用户松手后执行, 把视口拽回底部
-            delay(64)
-            if (autoScroll && !listState.isScrollInProgress && !pressedState.value && !followPaused.value) {
+            delay(96)
+            if (autoScroll && System.currentTimeMillis() - lastTouchAt.value > 320) {
                 // 索引等于消息数: 列表末尾的 bottom-anchor, 详 LazyColumn 内注释
                 listState.scrollToItem(messages.size)
             }
@@ -497,17 +498,20 @@ private fun ChatContent(
                                 // 抬起时已在底部才解除暂停 —— 滑回底部恢复跟随
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false)
+                                    lastTouchAt.value = System.currentTimeMillis()
                                     pressedState.value = true
                                     var travel = 0f
                                     while (true) {
                                         val ev = awaitPointerEvent()
                                         val pressed = ev.changes.any { it.pressed }
                                         val delta = ev.changes.sumOf { it.positionChange().y.toDouble() }.toFloat()
+                                        lastTouchAt.value = System.currentTimeMillis()
                                         travel += delta
                                         if (travel < -48f) followPaused.value = true
                                         if (travel > 48f) followPaused.value = false
                                         if (!pressed) break
                                     }
+                                    lastTouchAt.value = System.currentTimeMillis()
                                     pressedState.value = false
                                 }
                             },

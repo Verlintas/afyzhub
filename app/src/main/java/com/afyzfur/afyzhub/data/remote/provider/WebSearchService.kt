@@ -331,12 +331,14 @@ class WebSearchService(
          * sources 内的文本(往往是正文)保留, 官方来源块由发送流程统一追加。
          */
         fun stripModelEchoTags(content: String): String {
-            var out = Regex("""<web_search>(.*?)</web_search>""", RegexOption.DOT_MATCHES_ALL).replace(content, "")
-            // 未闭合的截断态: 从开标签吃到末尾
-            out = Regex("""<web_search>.*""", RegexOption.DOT_MATCHES_ALL).replace(out, "")
-            // sources 只剥标签对本身, 内部文本保留
-            out = out.replace("<sources>", "").replace("</sources>", "")
-            return out.trim()
+            // 只剥模型复读的 sources 标签对: 复读的闭合 sources 会把整段正文
+            // 当来源剥掉(正文消失)。sources 内的文本(往往是正文)保留。
+            // web_search 标签不剥: 一轮输出的搜索标签是合法记录, 剥掉会让
+            // 搜索栏消失、思考段错位; 复读的重复搜索块由 UI 端 seenQueries 去重。
+            return content
+                .replace("<sources>", "")
+                .replace("</sources>", "")
+                .trim()
         }
     }
 }
